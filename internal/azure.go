@@ -57,6 +57,12 @@ func (g *AzureIntegration) Stop() error {
 	return nil
 }
 
+func channelSender(pipe sdk.Pipe, channel <-chan sdk.Model) {
+	for each := range channel {
+		pipe.Write(each)
+	}
+}
+
 // Export is called to tell the integration to run an export
 func (g *AzureIntegration) Export(export sdk.Export) error {
 	sdk.LogInfo(g.logger, "export started")
@@ -80,49 +86,112 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	client := g.manager.HTTPManager().New("https://dev.azure.com/penrique", map[string]string{
 		"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte(":"+token)),
 	})
-	a := api.New(client, customerID, g.refType)
-	projects, err := a.FetchProjects()
-	if err != nil {
-		panic(err)
-	}
-	usermap := map[string]*sdk.WorkUser{}
-	for _, proj := range projects {
-		ids, err := a.FetchTeams(proj.RefID)
-		if err != nil {
-			fmt.Println("1 ERROR", err)
-			continue
-		}
-		err = a.FetchUsers(proj.RefID, ids, usermap)
-		if err != nil {
-			fmt.Println("2 ERROR", err)
-			continue
-		}
-		sprints, err := a.FetchSprints(proj.RefID, ids)
-		if err != nil {
-			fmt.Println("2 ERROR", err)
-			continue
-		}
-		for _, spr := range sprints {
-			pipe.Write(spr)
-		}
-		var updated time.Time
-		var strTime string
-		if ok, _ := state.Get("issues_updated_"+proj.RefID, &strTime); ok {
-			updated, _ = time.Parse(time.RFC3339Nano, strTime)
-		}
-		issues, err := a.FetchIssues(proj.RefID, updated)
-		if err != nil {
-			fmt.Println(" ERROR", err)
-		}
-		state.Set("issues_updated_"+proj.RefID, time.Now().Format(time.RFC3339Nano))
-		for _, iss := range issues {
-			pipe.Write(iss)
-		}
-		pipe.Write(proj)
-	}
-	for _, urs := range usermap {
-		pipe.Write(urs)
+
+	ok, concurr := config.GetInt("concurrency")
+	if !ok {
+		concurr = 10
 	}
 
-	return nil
+	prCommitsChannel := make(chan *sdk.SourceCodePullRequestCommit, concurr)
+	go func() {
+		for each := range prCommitsChannel {
+			pipe.Write(each)
+		}
+	}()
+	prsChannel := make(chan *sdk.SourceCodePullRequest, concurr)
+	go func() {
+		for each := range prsChannel {
+			pipe.Write(each)
+		}
+	}()
+	prCommentsChannel := make(chan *sdk.SourceCodePullRequestComment, concurr)
+	go func() {
+		for each := range prCommentsChannel {
+			pipe.Write(each)
+		}
+	}()
+	prReviewsChannel := make(chan *sdk.SourceCodePullRequestReview, concurr)
+	go func() {
+		for each := range prReviewsChannel {
+			pipe.Write(each)
+		}
+	}()
+	issueChannel := make(chan *sdk.WorkIssue, concurr)
+	go func() {
+		for each := range issueChannel {
+			pipe.Write(each)
+		}
+	}()
+	sprintChannel := make(chan *sdk.WorkSprint, concurr)
+	go func() {
+		for each := range sprintChannel {
+			pipe.Write(each)
+		}
+	}()
+
+	workUsermap := map[string]*sdk.WorkUser{}
+	sourcecodeUsermap := map[string]*sdk.SourceCodeUser{}
+
+	a := api.New(g.logger, client, customerID, g.refType, concurr)
+	projects, err := a.FetchProjects()
+	if err != nil {
+		return fmt.Errorf("error fetching projects. err: %v", err)
+	}
+
+	for _, proj := range projects {
+		pipe.Write(proj)
+
+		var updated time.Time
+		var strTime string
+		if ok, _ := state.Get("updated_"+proj.RefID, &strTime); ok {
+			updated, _ = time.Parse(time.RFC3339Nano, strTime)
+		}
+		repos, err := a.FetchRepos(proj.RefID)
+		if err != nil {
+			return fmt.Errorf("error fetching repos. err: %v", err)
+		}
+		for _, r := range repos {
+			pipe.Write(r)
+			if err := a.FetchPullRequests(proj.RefID, r.RefID, updated, prsChannel, prCommitsChannel, prCommentsChannel, prReviewsChannel); err != nil {
+				return fmt.Errorf("error fetching pull requests repos. err: %v", err)
+			}
+		}
+
+		ids, err := a.FetchTeams(proj.RefID)
+		if err != nil {
+			return fmt.Errorf("error fetching teams. err: %v", err)
+		}
+		if err := a.FetchUsers(proj.RefID, ids, workUsermap, sourcecodeUsermap); err != nil {
+			return fmt.Errorf("error fetching users. err: %v", err)
+		}
+		if err := a.FetchSprints(proj.RefID, ids, sprintChannel); err != nil {
+			return fmt.Errorf("error fetching sprints. err: %v", err)
+		}
+		if err := a.FetchIssues(proj.RefID, updated, issueChannel); err != nil {
+			return fmt.Errorf("error fetching issues. err: %v", err)
+		}
+		state.Set("updated_"+proj.RefID, time.Now().Format(time.RFC3339Nano))
+	}
+	async := api.NewAsync(2)
+	async.Do(func() error {
+		for _, urs := range workUsermap {
+			if err := pipe.Write(urs); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	async.Do(func() error {
+		for _, urs := range sourcecodeUsermap {
+			if err := pipe.Write(urs); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	err = async.Wait()
+	if err == nil {
+		sdk.LogInfo(g.logger, "export finished")
+	}
+	return err
 }

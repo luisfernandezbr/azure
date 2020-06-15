@@ -10,14 +10,18 @@ import (
 )
 
 type API struct {
-	customerID string
-	refType    string
-	client     sdk.HTTPClient
+	customerID  string
+	refType     string
+	client      sdk.HTTPClient
+	concurrency int64
+	logger      sdk.Logger
 }
 
-func New(client sdk.HTTPClient, customerID string, refType string) *API {
+func New(logger sdk.Logger, client sdk.HTTPClient, customerID string, refType string, concurrency int64) *API {
 	return &API{
-		client: client,
+		client:      client,
+		concurrency: concurrency,
+		logger:      logger,
 	}
 }
 
@@ -25,7 +29,9 @@ func (a *API) get(endpoint string, params url.Values, out interface{}) (*sdk.HTT
 	if params == nil {
 		params = url.Values{}
 	}
-	params.Set("api-version", "5.1")
+	if params.Get("api-version") == "" {
+		params.Set("api-version", "5.1")
+	}
 	return a.client.Get(out, sdk.WithEndpoint(endpoint), sdk.WithGetQueryParameters(params))
 }
 
@@ -33,7 +39,9 @@ func (a *API) post(endpoint string, data interface{}, params url.Values, out int
 	if params == nil {
 		params = url.Values{}
 	}
-	params.Set("api-version", "5.1")
+	if params.Get("api-version") == "" {
+		params.Set("api-version", "5.1")
+	}
 	b, err := json.Marshal(data)
 	if err != nil {
 		return nil, err

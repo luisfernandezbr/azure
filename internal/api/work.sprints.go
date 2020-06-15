@@ -6,9 +6,10 @@ import (
 	"github.com/pinpt/agent.next/sdk"
 )
 
-func (a *API) FetchSprints(projid string, teamids []string) ([]*sdk.WorkSprint, error) {
+func (a *API) FetchSprints(projid string, teamids []string, sprintChannel chan<- *sdk.WorkSprint) error {
 
-	var sprints []*sdk.WorkSprint
+	sdk.LogInfo(a.logger, "fetching sprints", "project_id", projid)
+
 	for _, teamid := range teamids {
 		endpoint := fmt.Sprintf("%s/_apis/work/teamsettings/iterations", teamid)
 
@@ -17,10 +18,10 @@ func (a *API) FetchSprints(projid string, teamids []string) ([]*sdk.WorkSprint, 
 		}
 		_, err := a.get(sdk.JoinURL(projid, endpoint), nil, &out)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for _, r := range out.Value {
-			sprint := sdk.WorkSprint{
+			sprint := &sdk.WorkSprint{
 				CustomerID: a.customerID,
 				// Goal is missing
 				Name:    r.Name,
@@ -40,8 +41,8 @@ func (a *API) FetchSprints(projid string, teamids []string) ([]*sdk.WorkSprint, 
 			sdk.ConvertTimeToDateModel(r.Attributes.StartDate, &sprint.StartedDate)
 			sdk.ConvertTimeToDateModel(r.Attributes.FinishDate, &sprint.EndedDate)
 			sdk.ConvertTimeToDateModel(r.Attributes.FinishDate, &sprint.CompletedDate)
-			sprints = append(sprints, &sprint)
+			sprintChannel <- sprint
 		}
 	}
-	return sprints, nil
+	return nil
 }

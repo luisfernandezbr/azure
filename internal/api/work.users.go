@@ -11,19 +11,35 @@ import (
 var doubleSlashRegex = regexp.MustCompile(`^(.*?)\\\\`)
 
 // FetchUsers gets all users from all the teams from a single project
-func (a *API) FetchUsers(projid string, teamids []string, usermap map[string]*sdk.WorkUser) error {
+func (a *API) FetchUsers(projid string, teamids []string, workUsermap map[string]*sdk.WorkUser, sourcecodeUsermap map[string]*sdk.SourceCodeUser) error {
+
+	sdk.LogInfo(a.logger, "fetching users", "project_id", projid)
+
 	rawusers, err := a.fetchAllUsers(projid, teamids)
 	if err != nil {
 		return err
 	}
 	for _, u := range rawusers {
-		usermap[u.ID] = &sdk.WorkUser{
+		workUsermap[u.ID] = &sdk.WorkUser{
 			AvatarURL:  sdk.StringPointer(u.ImageURL),
 			CustomerID: a.customerID,
 			Name:       doubleSlashRegex.ReplaceAllString(u.DisplayName, ""),
+			Member:     true,
 			RefID:      u.ID,
 			RefType:    a.refType,
 			Username:   doubleSlashRegex.ReplaceAllString(u.UniqueName, ""),
+			URL:        sdk.StringPointer(u.URL),
+		}
+		sourcecodeUsermap[u.ID] = &sdk.SourceCodeUser{
+			AvatarURL:  sdk.StringPointer(u.ImageURL),
+			CustomerID: a.customerID,
+			Name:       doubleSlashRegex.ReplaceAllString(u.DisplayName, ""),
+			Member:     true,
+			RefID:      u.ID,
+			RefType:    a.refType,
+			Username:   sdk.StringPointer(doubleSlashRegex.ReplaceAllString(u.UniqueName, "")),
+			Type:       sdk.SourceCodeUserTypeHuman,
+			URL:        sdk.StringPointer(u.URL),
 		}
 	}
 	return nil

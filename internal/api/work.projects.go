@@ -10,6 +10,8 @@ import (
 // FetchProjects gets the projects and sends them to the projchan channel
 func (a *API) FetchProjects() ([]*sdk.WorkProject, error) {
 
+	sdk.LogInfo(a.logger, "fetching initial projects")
+
 	endpoint := "_apis/projects"
 	params := url.Values{}
 	params.Set("stateFilter", "all")

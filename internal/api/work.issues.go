@@ -12,12 +12,28 @@ import (
 
 const whereDateFormat = `01/02/2006 15:04:05Z`
 
-func (a *API) FetchIssues(projid string, updated time.Time) ([]*sdk.WorkIssue, error) {
+type queryResponse struct {
+	ClientProviders interface{} `json:"clientProviders"`
+	Data            struct {
+		Provider struct {
+			Data struct {
+				Payload struct {
+					Columns []string        `json:"columns"`
+					Rows    [][]interface{} `json:"rows"`
+				} `json:"payload"`
+			} `json:"data"`
+		} `json:"ms.vss-work-web.work-item-query-data-provider"`
+	} `json:"data"`
+}
+
+func (a *API) FetchIssues(projid string, updated time.Time, issueChannel chan<- *sdk.WorkIssue) error {
+
+	sdk.LogInfo(a.logger, "fetching issues for project", "project_id", projid)
 
 	var q struct {
 		Query string `json:"query"`
 	}
-	q.Query = `Select System.ID From WorkItems`
+	q.Query = `Select [System.ID], [System.Title] From WorkItems ORDER BY System.ChangedDate Desc` // get newest first
 	if !updated.IsZero() {
 		q.Query += fmt.Sprintf(` WHERE System.ChangedDate > '%s'`, updated.Format(whereDateFormat))
 	}
@@ -26,59 +42,25 @@ func (a *API) FetchIssues(projid string, updated time.Time) ([]*sdk.WorkIssue, e
 
 	var out workItemsResponse
 	if _, err := a.post(sdk.JoinURL(projid, "_apis/wit/wiql"), q, params, &out); err != nil {
-		return nil, nil
+		return nil
 	}
 
-	var res []*sdk.WorkIssue
 	var items []string
 	for i, item := range out.WorkItems {
 		if i != 0 && (i%200) == 0 {
-			issues, err := a.fetchIssues(projid, items)
+			err := a.fetchIssues(projid, items, issueChannel)
 			if err != nil {
-				return nil, err
-			}
-			if issues != nil {
-				res = append(res, issues...)
+				return err
 			}
 			items = []string{}
 		}
 		items = append(items, fmt.Sprint(item.ID))
 	}
-	issues, err := a.fetchIssues(projid, items)
+	err := a.fetchIssues(projid, items, issueChannel)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if issues != nil {
-		res = append(res, issues...)
-	}
-	return res, nil
-}
-
-type linksResponse struct {
-	HTML struct {
-		HREF string `json:"href"`
-	} `json:"html"`
-	// there are more here, fields, self, workItemComments, workItemRevisions, workItemType, and workItemUpdates
-}
-
-type fieldsResponse struct {
-	AssignedTo     usersResponse `json:"System.AssignedTo"`
-	ChangedDate    time.Time     `json:"System.ChangedDate"`
-	CreatedDate    time.Time     `json:"System.CreatedDate"`
-	CreatedBy      usersResponse `json:"System.CreatedBy"`
-	Description    string        `json:"System.Description"`
-	DueDate        time.Time     `json:"Microsoft.VSTS.Scheduling.DueDate"` // ??
-	IterationPath  string        `json:"System.IterationPath"`
-	TeamProject    string        `json:"System.TeamProject"`
-	Priority       int           `json:"Microsoft.VSTS.Common.Priority"`
-	Reason         string        `json:"System.Reason"`
-	ResolvedReason string        `json:"Microsoft.VSTS.Common.ResolvedReason"`
-	ResolvedDate   time.Time     `json:"Microsoft.VSTS.Common.ResolvedDate"`
-	StoryPoints    float64       `json:"Microsoft.VSTS.Scheduling.StoryPoints"`
-	State          string        `json:"System.State"`
-	Tags           string        `json:"System.Tags"`
-	Title          string        `json:"System.Title"`
-	WorkItemType   string        `json:"System.WorkItemType"`
+	return nil
 }
 
 func stringEquals(str string, vals ...string) bool {
@@ -90,12 +72,13 @@ func stringEquals(str string, vals ...string) bool {
 	return false
 }
 
-func (a *API) fetchIssues(projid string, ids []string) ([]*sdk.WorkIssue, error) {
+func (a *API) fetchIssues(projid string, ids []string, issueChannel chan<- *sdk.WorkIssue) error {
+
+	sdk.LogInfo(a.logger, "fetching issues", "project_id", projid, "count", len(ids))
 
 	if len(ids) == 0 {
-		return nil, nil
+		return nil
 	}
-	fmt.Println("fetching issues from", ids[0], "to", ids[len(ids)-1])
 	params := url.Values{}
 	params.Set("ids", strings.Join(ids, ","))
 	params.Set("$expand", "all")
@@ -107,11 +90,9 @@ func (a *API) fetchIssues(projid string, ids []string) ([]*sdk.WorkIssue, error)
 	}
 	_, err := a.get(sdk.JoinURL(projid, endpoint), params, &out)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	async := NewAsync(10)
-	var mutex sync.Mutex
-	var res []*sdk.WorkIssue
 	for _, itm := range out.Value {
 		// copy the value to a new variable so that it's inside this scope
 		item := itm
@@ -171,17 +152,15 @@ func (a *API) fetchIssues(projid string, ids []string) ([]*sdk.WorkIssue, error)
 				updatedDate = fields.ChangedDate
 			}
 			sdk.ConvertTimeToDateModel(updatedDate, &issue.UpdatedDate)
-			mutex.Lock()
-			res = append(res, issue)
-			mutex.Unlock()
+			issueChannel <- issue
 			return nil
 		})
 	}
 
 	if err := async.Wait(); err != nil {
-		return nil, err
+		return err
 	}
-	return res, nil
+	return nil
 }
 
 var hasResolutions = map[string]bool{}
@@ -202,7 +181,6 @@ func (a *API) hasResolution(projid, refname string) bool {
 		Value []resolutionResponse `json:"value"`
 	}
 	if _, err := a.get(sdk.JoinURL(projid, endpoint), params, &out); err != nil {
-		fmt.Println(err)
 		return false
 	}
 	for _, g := range out.Value {
@@ -235,7 +213,6 @@ func (a *API) completedState(projid string, itemtype string, state string) bool 
 	endpoint := fmt.Sprintf(`_apis/wit/workitemtypes/%s`, url.PathEscape(itemtype))
 	var out workConfigResponse
 	if _, err := a.get(sdk.JoinURL(projid, endpoint), nil, &out); err != nil {
-		fmt.Println(err)
 		return false
 	}
 	for _, r := range out.States {

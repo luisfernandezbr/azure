@@ -3,9 +3,13 @@ package api
 import (
 	"fmt"
 	"net/url"
+
+	"github.com/pinpt/agent.next/sdk"
 )
 
 func (a *API) FetchTeams(projid string) ([]string, error) {
+
+	sdk.LogInfo(a.logger, "fetching teams", "project_id", projid)
 
 	endpoint := fmt.Sprintf(`_apis/projects/%s/teams`, url.PathEscape(projid))
 	var out struct {
