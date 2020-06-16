@@ -57,12 +57,6 @@ func (g *AzureIntegration) Stop() error {
 	return nil
 }
 
-func channelSender(pipe sdk.Pipe, channel <-chan sdk.Model) {
-	for each := range channel {
-		pipe.Write(each)
-	}
-}
-
 // Export is called to tell the integration to run an export
 func (g *AzureIntegration) Export(export sdk.Export) error {
 	sdk.LogInfo(g.logger, "export started")
