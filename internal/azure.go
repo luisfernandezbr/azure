@@ -83,7 +83,11 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	if !ok {
 		return errors.New("Missing access_token")
 	}
-	client := g.manager.HTTPManager().New("https://dev.azure.com/penrique", map[string]string{
+	ok, org := config.GetString("org_name")
+	if !ok {
+		return errors.New("Missing org_name")
+	}
+	client := g.manager.HTTPManager().New("https://dev.azure.com/"+org, map[string]string{
 		"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte(":"+token)),
 	})
 
