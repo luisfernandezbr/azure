@@ -11,7 +11,8 @@ import (
 
 // FetchPullRequests calls the pull request api and processes the reponse sending each object to the corresponding channel async
 // sdk.SourceCodePullRequest, sdk.SourceCodePullRequestReview, sdk.SourceCodePullRequestComment, and sdk.SourceCodePullRequestCommit
-func (a *API) FetchPullRequests(projid string, repoid string, updated time.Time,
+func (a *API) FetchPullRequests(
+	projid string, repoid string, updated time.Time,
 	prsChannel chan<- *sdk.SourceCodePullRequest,
 	prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit,
 	prCommentsChannel chan<- *sdk.SourceCodePullRequestComment,
@@ -20,21 +21,48 @@ func (a *API) FetchPullRequests(projid string, repoid string, updated time.Time,
 	sdk.LogInfo(a.logger, "fetching pull requests", "project_id", projid, "repo_id", repoid)
 
 	endpoint := fmt.Sprintf(`%s/_apis/git/repositories/%s/pullrequests`, url.PathEscape(projid), url.PathEscape(repoid))
-	var out struct {
-		Value []pullRequestResponse `json:"value"`
-	}
+
 	params := url.Values{}
 	params.Set("$top", "1000")
 	params.Set("status", "all")
-	_, err := a.get(endpoint, params, &out)
-	if err != nil {
+	// ===========================================
+	out := make(chan objects, 1)
+	errochan := make(chan error, 1)
+	go func() {
+		for object := range out {
+			value := []pullRequestResponse{}
+			if err := object.Unmarshal(&value); err != nil {
+				errochan <- err
+			}
+			err := a.processPullRequests(value, projid, repoid, updated, prsChannel, prCommitsChannel, prCommentsChannel, prReviewsChannel)
+			if err != nil {
+				errochan <- err
+				return
+			}
+		}
+		errochan <- nil
+	}()
+	// ===========================================
+	if err := a.paginate(endpoint, params, out); err != nil {
 		return err
 	}
+	err := <-errochan
+	return err
+}
+
+func (a *API) processPullRequests(value []pullRequestResponse,
+	projid string, repoid string, updated time.Time,
+	prsChannel chan<- *sdk.SourceCodePullRequest,
+	prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit,
+	prCommentsChannel chan<- *sdk.SourceCodePullRequestComment,
+	prReviewsChannel chan<- *sdk.SourceCodePullRequestReview,
+) error {
+
 	historical := updated.IsZero()
 	var pullrequests []pullRequestResponse
 	var pullrequestcomments []pullRequestResponse
-	for _, p := range out.Value {
 
+	for _, p := range value {
 		// modify the url to show the ui instead of api call
 		p.URL = strings.ToLower(p.URL)
 		p.URL = strings.Replace(p.URL, "_apis/git/repositories", "_git", 1)
@@ -50,33 +78,25 @@ func (a *API) FetchPullRequests(projid string, repoid string, updated time.Time,
 
 	}
 
-	async := NewAsync(10)
+	// =================== Commits ===================
+	async := NewAsync(a.concurrency)
 	for _, p := range pullrequests {
 		pr := pullRequestResponseWithShas{}
 		pr.pullRequestResponse = p
 		async.Do(func() error {
 			pr.SourceBranch = strings.TrimPrefix(p.SourceBranch, "refs/heads/")
 			pr.TargetBranch = strings.TrimPrefix(p.TargetBranch, "refs/heads/")
-			commits, err := a.fetchPullRequestCommits(pr.Repository.ID, pr.PullRequestID)
-			if err != nil {
+			if err := a.sendPullRequestCommits(pr, prsChannel, prCommitsChannel); err != nil {
 				return fmt.Errorf("error fetching commits for PR, skipping pr_id:%v repo_id:%v err:%v", pr.PullRequestID, pr.Repository.ID, err)
-			}
-			// pr without commits? this should never be 0
-			if len(commits) > 0 {
-				for _, commit := range commits {
-					pr.commitSHAs = append(pr.commitSHAs, commit.CommitID)
-					pr := pr
-					a.sendPullRequestCommit(repoid, pr, prCommitsChannel)
-				}
-				a.sendPullRequest(repoid, pr, prsChannel)
 			}
 			return nil
 		})
 	}
-	if err = async.Wait(); err != nil {
+	if err := async.Wait(); err != nil {
 		return err
 	}
 
+	// =================== Comments ===================
 	async = NewAsync(10)
 	for _, p := range pullrequestcomments {
 		pr := p
@@ -84,9 +104,7 @@ func (a *API) FetchPullRequests(projid string, repoid string, updated time.Time,
 			return a.sendPullRequestComment(repoid, pr, prCommentsChannel, prReviewsChannel)
 		})
 	}
-	err = async.Wait()
-	return err
-
+	return async.Wait()
 }
 
 func (a *API) sendPullRequest(repoRefID string, p pullRequestResponseWithShas, prsChannel chan<- *sdk.SourceCodePullRequest) {

@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"time"
@@ -81,24 +80,22 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	if !ok {
 		return errors.New("Missing org_name")
 	}
-	client := g.manager.HTTPManager().New("https://dev.azure.com/"+org, map[string]string{
-		"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte(":"+token)),
-	})
+	client := g.manager.HTTPManager().New("https://dev.azure.com/"+org, nil)
 
 	ok, concurr := config.GetInt("concurrency")
 	if !ok {
 		concurr = 10
 	}
 
-	prCommitsChannel := make(chan *sdk.SourceCodePullRequestCommit, concurr)
-	go func() {
-		for each := range prCommitsChannel {
-			pipe.Write(each)
-		}
-	}()
 	prsChannel := make(chan *sdk.SourceCodePullRequest, concurr)
 	go func() {
 		for each := range prsChannel {
+			pipe.Write(each)
+		}
+	}()
+	prCommitsChannel := make(chan *sdk.SourceCodePullRequestCommit, concurr)
+	go func() {
+		for each := range prCommitsChannel {
 			pipe.Write(each)
 		}
 	}()
@@ -130,7 +127,9 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	workUsermap := map[string]*sdk.WorkUser{}
 	sourcecodeUsermap := map[string]*sdk.SourceCodeUser{}
 
-	a := api.New(g.logger, client, customerID, g.refType, concurr)
+	a := api.New(g.logger, client, customerID, g.refType, concurr, &api.BasicCreds{
+		Password: token,
+	})
 	projects, err := a.FetchProjects()
 	if err != nil {
 		return fmt.Errorf("error fetching projects. err: %v", err)

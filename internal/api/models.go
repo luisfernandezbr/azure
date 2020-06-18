@@ -1,6 +1,24 @@
 package api
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
+
+type pageResponse struct {
+	Count int64   `json:"count"`
+	Value objects `json:"value"`
+}
+
+type objects []map[string]interface{}
+
+func (o objects) Unmarshal(out interface{}) error {
+	b, err := json.Marshal(o)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, out)
+}
 
 type workItemResponse struct {
 	Links struct {

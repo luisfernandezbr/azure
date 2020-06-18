@@ -9,47 +9,54 @@ import (
 
 func (a *API) sendPullRequestCommit(repoRefID string, p pullRequestResponseWithShas, prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit) error {
 	sha := p.commitSHAs[len(p.commitSHAs)-1]
-	c, err := a.fetchSingleCommit(p.Repository.ID, sha)
-	if err != nil {
+	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/commits/%s`, url.PathEscape(p.Repository.ID), url.PathEscape(sha))
+	var out singleCommitResponse
+	params := url.Values{}
+	params.Set("$changeCount", "1000")
+	if _, err := a.get(endpoint, params, &out); err != nil {
 		return err
 	}
 	commit := &sdk.SourceCodePullRequestCommit{
-		Additions: c.ChangeCounts.Add,
+		Additions: out.ChangeCounts.Add,
 		// AuthorRefID: not provided
 
 		BranchID: sdk.NewSourceCodeBranchID(a.customerID, repoRefID, a.refType, p.SourceBranch, p.commitSHAs[0]),
 		// CommitterRefID: not provided
 		CustomerID:    a.customerID,
-		Deletions:     c.ChangeCounts.Delete,
-		Message:       c.Comment,
+		Deletions:     out.ChangeCounts.Delete,
+		Message:       out.Comment,
 		PullRequestID: sdk.NewSourceCodePullRequestID(a.customerID, fmt.Sprint(p.PullRequestID), a.refType, repoRefID),
 		RefID:         sha,
 		RefType:       a.refType,
 		RepoID:        repoRefID,
 		Sha:           sha,
-		URL:           c.RemoteURL,
+		URL:           out.RemoteURL,
 	}
-	sdk.ConvertTimeToDateModel(c.Push.Date, &commit.CreatedDate)
+	sdk.ConvertTimeToDateModel(out.Push.Date, &commit.CreatedDate)
 	prCommitsChannel <- commit
 	return nil
 }
 
-func (a *API) fetchPullRequestCommits(repoid string, prid int64) ([]commitsResponseLight, error) {
-	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/pullRequests/%d/commits`, url.PathEscape(repoid), prid)
+func (a *API) sendPullRequestCommits(pr pullRequestResponseWithShas, prsChannel chan<- *sdk.SourceCodePullRequest, prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit) error {
+	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/pullRequests/%d/commits`, url.PathEscape(pr.Repository.ID), pr.PullRequestID)
 	var out struct {
 		Value []commitsResponseLight `json:"value"`
 	}
 	params := url.Values{}
-	params.Set("$top", "1000")
-	_, err := a.get(endpoint, params, &out)
-	return out.Value, err
-}
+	params.Set("$top", "10000") // there is no pagination, so make this number BIG
+	if _, err := a.get(endpoint, params, &out); err != nil {
+		return err
+	}
+	if len(out.Value) > 0 { // pr without commits? this should never be 0
+		for _, commit := range out.Value {
+			pr.commitSHAs = append(pr.commitSHAs, commit.CommitID)
+			pr := pr
+			if err := a.sendPullRequestCommit(pr.Repository.ID, pr, prCommitsChannel); err != nil {
+				return err
+			}
+		}
+		a.sendPullRequest(pr.Repository.ID, pr, prsChannel)
+	}
 
-func (a *API) fetchSingleCommit(repoid string, commitid string) (singleCommitResponse, error) {
-	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/commits/%s`, url.PathEscape(repoid), url.PathEscape(commitid))
-	var out singleCommitResponse
-	params := url.Values{}
-	params.Set("$changeCount", "1000")
-	_, err := a.get(endpoint, params, &out)
-	return out, err
+	return nil
 }

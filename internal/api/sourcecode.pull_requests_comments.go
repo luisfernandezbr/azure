@@ -11,12 +11,16 @@ import (
 var pullRequestCommentVotedReg = regexp.MustCompile(`(.+?)( voted )(-10|-5|0|5|10.*)`)
 
 func (a *API) sendPullRequestComment(repoRefID string, pr pullRequestResponse, prCommentsChannel chan<- *sdk.SourceCodePullRequestComment, prReviewsChannel chan<- *sdk.SourceCodePullRequestReview) error {
-	threads, err := a.fetchPullRequestThreads(pr.Repository.ID, pr.PullRequestID)
-	if err != nil {
+
+	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/pullRequests/%d/threads`, url.PathEscape(pr.Repository.ID), pr.PullRequestID)
+	var out struct {
+		Value []threadsReponse `json:"value"`
+	}
+	if _, err := a.get(endpoint, nil, &out); err != nil {
 		return fmt.Errorf("error fetching threads for PR, skipping. pr_id: %v. repo_id: %v. err: %v", pr.PullRequestID, pr.Repository.ID, err)
 	}
-	for _, thread := range threads {
 
+	for _, thread := range out.Value {
 		for _, comment := range thread.Comments {
 			// comment type "text" means it's a real user instead of system
 			if comment.CommentType == "text" {
@@ -70,13 +74,4 @@ func (a *API) sendPullRequestComment(repoRefID string, pr pullRequestResponse, p
 		}
 	}
 	return nil
-}
-
-func (a *API) fetchPullRequestThreads(repoid string, prid int64) ([]threadsReponse, error) {
-	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/pullRequests/%d/threads`, url.PathEscape(repoid), prid)
-	var out struct {
-		Value []threadsReponse `json:"value"`
-	}
-	_, err := a.get(endpoint, nil, &out)
-	return out.Value, err
 }
