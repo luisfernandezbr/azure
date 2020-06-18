@@ -72,7 +72,7 @@ func New(logger sdk.Logger, client sdk.HTTPClient, customerID string, refType st
 	}
 }
 
-func ensuserParams(p url.Values) url.Values {
+func ensureParams(p url.Values) url.Values {
 	if p == nil {
 		p = url.Values{}
 	}
@@ -113,7 +113,7 @@ func (a *API) paginate(endpoint string, params url.Values, out chan<- objects) e
 
 func (a *API) get(endpoint string, params url.Values, out interface{}) (*sdk.HTTPResponse, error) {
 
-	params = ensuserParams(params)
+	params = ensureParams(params)
 	resp, err := a.client.Get(out, sdk.WithEndpoint(endpoint), sdk.WithGetQueryParameters(params), sdk.WithAuthorization(a.creds.auth()))
 	if resp.StatusCode == http.StatusUnauthorized {
 		if creds, ok := a.creds.(*OAuthCreds); ok {
@@ -131,7 +131,7 @@ func (a *API) get(endpoint string, params url.Values, out interface{}) (*sdk.HTT
 }
 
 func (a *API) post(endpoint string, data interface{}, params url.Values, out interface{}) (*sdk.HTTPResponse, error) {
-	params = ensuserParams(params)
+	params = ensureParams(params)
 	b, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
