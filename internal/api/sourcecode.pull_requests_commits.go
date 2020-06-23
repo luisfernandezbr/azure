@@ -12,25 +12,25 @@ func (a *API) sendPullRequestCommit(repoRefID string, p pullRequestResponseWithS
 	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/commits/%s`, url.PathEscape(p.Repository.ID), url.PathEscape(sha))
 	var out singleCommitResponse
 	params := url.Values{}
-	params.Set("$changeCount", "1000")
+	params.Set("changeCount", "1")
+
 	if _, err := a.get(endpoint, params, &out); err != nil {
 		return err
 	}
 	commit := &sdk.SourceCodePullRequestCommit{
-		Additions: out.ChangeCounts.Add,
-		// AuthorRefID: not provided
-
-		BranchID: sdk.NewSourceCodeBranchID(a.customerID, repoRefID, a.refType, p.SourceBranch, p.commitSHAs[0]),
-		// CommitterRefID: not provided
-		CustomerID:    a.customerID,
-		Deletions:     out.ChangeCounts.Delete,
-		Message:       out.Comment,
-		PullRequestID: sdk.NewSourceCodePullRequestID(a.customerID, fmt.Sprint(p.PullRequestID), a.refType, repoRefID),
-		RefID:         sha,
-		RefType:       a.refType,
-		RepoID:        repoRefID,
-		Sha:           sha,
-		URL:           out.RemoteURL,
+		Additions:      out.ChangeCounts.Add,
+		AuthorRefID:    out.Push.PushedBy.ID,
+		BranchID:       sdk.NewSourceCodeBranchID(a.customerID, repoRefID, a.refType, p.SourceBranch, p.commitSHAs[0]),
+		CommitterRefID: out.Push.PushedBy.ID,
+		CustomerID:     a.customerID,
+		Deletions:      out.ChangeCounts.Delete,
+		Message:        out.Comment,
+		PullRequestID:  sdk.NewSourceCodePullRequestID(a.customerID, fmt.Sprint(p.PullRequestID), a.refType, repoRefID),
+		RefID:          sha,
+		RefType:        a.refType,
+		RepoID:         sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
+		Sha:            sha,
+		URL:            out.RemoteURL,
 	}
 	sdk.ConvertTimeToDateModel(out.Push.Date, &commit.CreatedDate)
 	prCommitsChannel <- commit

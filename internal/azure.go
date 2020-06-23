@@ -126,7 +126,6 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 
 	workUsermap := map[string]*sdk.WorkUser{}
 	sourcecodeUsermap := map[string]*sdk.SourceCodeUser{}
-
 	a := api.New(g.logger, client, customerID, g.refType, concurr, &api.BasicCreds{
 		Password: token,
 	})

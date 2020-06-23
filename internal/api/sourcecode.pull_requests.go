@@ -116,7 +116,7 @@ func (a *API) sendPullRequest(repoRefID string, p pullRequestResponseWithShas, p
 		Description:    p.Description,
 		RefID:          fmt.Sprintf("%d", p.PullRequestID),
 		RefType:        a.refType,
-		RepoID:         repoRefID,
+		RepoID:         sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
 		Title:          p.Title,
 		URL:            p.URL,
 		CommitShas:     p.commitSHAs,

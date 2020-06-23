@@ -19,7 +19,6 @@ func (a *API) sendPullRequestComment(repoRefID string, pr pullRequestResponse, p
 	if _, err := a.get(endpoint, nil, &out); err != nil {
 		return fmt.Errorf("error fetching threads for PR, skipping. pr_id: %v. repo_id: %v. err: %v", pr.PullRequestID, pr.Repository.ID, err)
 	}
-
 	for _, thread := range out.Value {
 		for _, comment := range thread.Comments {
 			// comment type "text" means it's a real user instead of system
@@ -31,7 +30,7 @@ func (a *API) sendPullRequestComment(repoRefID string, pr pullRequestResponse, p
 					PullRequestID: sdk.NewSourceCodePullRequestID(a.customerID, a.refType, fmt.Sprint(pr.PullRequestID), repoRefID),
 					RefID:         refid,
 					RefType:       a.refType,
-					RepoID:        repoRefID,
+					RepoID:        sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
 					UserRefID:     comment.Author.ID,
 				}
 				sdk.ConvertTimeToDateModel(comment.PublishedDate, &c.CreatedDate)
@@ -62,7 +61,7 @@ func (a *API) sendPullRequestComment(repoRefID string, pr pullRequestResponse, p
 						PullRequestID: sdk.NewSourceCodePullRequestID(a.customerID, fmt.Sprintf("%d", pr.PullRequestID), a.refType, repoRefID),
 						RefID:         refid,
 						RefType:       a.refType,
-						RepoID:        repoRefID,
+						RepoID:        sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
 						State:         state,
 						URL:           pr.URL,
 						UserRefID:     thread.Identities["1"].ID,
