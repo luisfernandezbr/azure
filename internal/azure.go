@@ -168,7 +168,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 		}
 		state.Set("updated_"+proj.RefID, time.Now().Format(time.RFC3339Nano))
 	}
-	async := api.NewAsync(2)
+	async := sdk.NewAsync(2)
 	async.Do(func() error {
 		for _, urs := range workUsermap {
 			if err := pipe.Write(urs); err != nil {

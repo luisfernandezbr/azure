@@ -79,7 +79,7 @@ func (a *API) processPullRequests(value []pullRequestResponse,
 	}
 
 	// =================== Commits ===================
-	async := NewAsync(a.concurrency)
+	async := sdk.NewAsync(a.concurrency)
 	for _, p := range pullrequests {
 		pr := pullRequestResponseWithShas{}
 		pr.pullRequestResponse = p
@@ -97,7 +97,7 @@ func (a *API) processPullRequests(value []pullRequestResponse,
 	}
 
 	// =================== Comments ===================
-	async = NewAsync(10)
+	async = sdk.NewAsync(a.concurrency)
 	for _, p := range pullrequestcomments {
 		pr := p
 		async.Do(func() error {

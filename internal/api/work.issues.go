@@ -92,7 +92,7 @@ func (a *API) fetchIssues(projid string, ids []string, issueChannel chan<- *sdk.
 	if err != nil {
 		return err
 	}
-	async := NewAsync(10)
+	async := sdk.NewAsync(a.concurrency)
 	for _, itm := range out.Value {
 		// copy the value to a new variable so that it's inside this scope
 		item := itm
