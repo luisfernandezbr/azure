@@ -126,9 +126,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 
 	workUsermap := map[string]*sdk.WorkUser{}
 	sourcecodeUsermap := map[string]*sdk.SourceCodeUser{}
-	a := api.New(g.logger, client, customerID, g.refType, concurr, &api.BasicCreds{
-		Password: token,
-	})
+	a := api.New(g.logger, client, customerID, g.refType, concurr, sdk.WithBasicAuth("", token))
 	projects, err := a.FetchProjects()
 	if err != nil {
 		return fmt.Errorf("error fetching projects. err: %v", err)
