@@ -324,3 +324,23 @@ type threadsReponse struct {
 	LastUpdatedDate time.Time                `json:"lastUpdatedDate"`
 	PublishedDate   time.Time                `json:"publishedDate"`
 }
+
+type webhookPayload struct {
+	ConsumerActionID string `json:"consumerActionId"`
+	ConsumerID       string `json:"consumerId"`
+	ConsumerInputs   struct {
+		URL string `json:"url"`
+	} `json:"consumerInputs"`
+	EventType       string `json:"eventType"`
+	PublisherID     string `json:"publisherId"`
+	PublisherInputs struct {
+		// AreaPath     string `json:"areaPath"`
+		// Repository   string `json:"repository"`
+		// Branch       string `json:"branch"`
+		// PushedBy     string `json:"pushedBy"`
+		ProjectID string `json:"projectId"`
+		// WorkItemType string `json:"workItemType"`
+	} `json:"publisherInputs"`
+	ResourceVersion string `json:"resourceVersion"`
+	Scope           int    `json:"scope"`
+}

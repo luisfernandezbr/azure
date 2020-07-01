@@ -34,8 +34,28 @@ func (g *AzureIntegration) Start(logger sdk.Logger, config sdk.Config, manager s
 
 // Enroll is called when a new integration instance is added
 func (g *AzureIntegration) Enroll(instance sdk.Instance) error {
-	sdk.LogInfo(g.logger, "enroll not implemented")
-	return nil
+
+	config := instance.Config()
+	ok, org := config.GetString("org_name")
+	if !ok {
+		return errors.New("Missing org_name")
+	}
+	ok, token := config.GetString("access_token")
+	if !ok {
+		return errors.New("Missing access_token")
+	}
+	ok, concurr := config.GetInt("concurrency")
+	if !ok {
+		concurr = 10
+	}
+	customerID := instance.CustomerID()
+	integrationID := instance.IntegrationID()
+	url, err := g.manager.CreateWebHook(customerID, g.refType, integrationID, org)
+	if err != nil {
+		fmt.Println("err", err)
+		return err
+	}
+	return g.registerWebhook(org, customerID, token, url, concurr)
 }
 
 // Dismiss is called when an existing integration instance is removed
@@ -72,6 +92,11 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	sdk.LogDebug(g.logger, "export starting")
 	// Config is any customer specific configuration for this customer
 	config := export.Config()
+	// instance := sdk.NewInstance(config, state, pipe, customerID, sdk.Hash("azure_devops"))
+	// if err := g.Enroll(*instance); err != nil {
+	// 	return err
+	// }
+
 	ok, token := config.GetString("access_token")
 	if !ok {
 		return errors.New("Missing access_token")
@@ -80,6 +105,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	if !ok {
 		return errors.New("Missing org_name")
 	}
+
 	client := g.manager.HTTPManager().New("https://dev.azure.com/"+org, nil)
 
 	ok, concurr := config.GetInt("concurrency")
