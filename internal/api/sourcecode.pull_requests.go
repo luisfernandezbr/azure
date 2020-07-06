@@ -113,7 +113,7 @@ func (a *API) sendPullRequest(repoRefID string, p pullRequestResponseWithShas, p
 		BranchName:     p.SourceBranch,
 		CreatedByRefID: p.CreatedBy.ID,
 		CustomerID:     a.customerID,
-		Description:    p.Description,
+		Description:    `<div class="source-azure">` + p.Description + "</div>",
 		RefID:          fmt.Sprintf("%d", p.PullRequestID),
 		RefType:        a.refType,
 		RepoID:         sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
