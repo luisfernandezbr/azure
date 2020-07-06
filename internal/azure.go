@@ -50,6 +50,12 @@ func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
 	return nil
 }
 
+// Mutation is called when a mutation is received on behalf of the integration
+func (g *AzureIntegration) Mutation(mutation sdk.Mutation) error {
+	sdk.LogInfo(g.logger, "mutation not implemented")
+	return nil
+}
+
 // Stop is called when the integration is shutting down for cleanup
 func (g *AzureIntegration) Stop() error {
 	sdk.LogInfo(g.logger, "stopping")
