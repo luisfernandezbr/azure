@@ -88,3 +88,12 @@ func (a *API) delete(endpoint string, params url.Values, out interface{}) (*sdk.
 	params = ensureParams(params)
 	return a.client.Delete(out, sdk.WithEndpoint(endpoint), sdk.WithGetQueryParameters(params), a.creds)
 }
+
+func (a *API) patch(endpoint string, data interface{}, params url.Values, out interface{}) (*sdk.HTTPResponse, error) {
+	params = ensureParams(params)
+	b, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	return a.client.Patch(bytes.NewBuffer(b), out, sdk.WithEndpoint(endpoint), sdk.WithGetQueryParameters(params), a.creds)
+}

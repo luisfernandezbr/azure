@@ -12,20 +12,7 @@ import (
 
 const whereDateFormat = `01/02/2006 15:04:05Z`
 
-type queryResponse struct {
-	ClientProviders interface{} `json:"clientProviders"`
-	Data            struct {
-		Provider struct {
-			Data struct {
-				Payload struct {
-					Columns []string        `json:"columns"`
-					Rows    [][]interface{} `json:"rows"`
-				} `json:"payload"`
-			} `json:"data"`
-		} `json:"ms.vss-work-web.work-item-query-data-provider"`
-	} `json:"data"`
-}
-
+// FetchIssues gets issues from project id
 func (a *API) FetchIssues(projid string, updated time.Time, issueChannel chan<- *sdk.WorkIssue) error {
 
 	sdk.LogInfo(a.logger, "fetching issues for project", "project_id", projid)
@@ -63,6 +50,43 @@ func (a *API) FetchIssues(projid string, updated time.Time, issueChannel chan<- 
 	return nil
 }
 
+// CreateIssue creates an issue
+func (a *API) CreateIssue(obj sdk.WorkIssueCreateMutation) error {
+	endpoint := fmt.Sprintf("%s/_apis/wit/workitems/%s", obj.ProjectRefID, *obj.Type.Name)
+	type item struct {
+		OP    string `json:"op"`
+		Path  string `json:"path"`
+		Value string `json:"value"`
+	}
+	var payload []item
+	addToPayload := func(path string, value string) {
+		payload = append(payload, item{
+			OP:    "add",
+			Path:  "/fields/" + path,
+			Value: value,
+		})
+	}
+	addToPayload("System.Title", obj.Title)
+	addToPayload("System.Description", obj.Description)
+	if obj.Priority != nil {
+		addToPayload("Microsoft.VSTS.Common.Priority", *obj.Priority.Name)
+	}
+	if obj.Epic != nil {
+		addToPayload("System.IterationPath", *obj.Epic.Name)
+	}
+	if obj.AssigneeRefID != nil {
+		addToPayload("System.AssignedTo", sdk.Stringify(usersResponse{ID: *obj.AssigneeRefID}))
+	}
+	if obj.Labels != nil {
+		addToPayload("System.Tags", strings.Join(obj.Labels, "; "))
+	}
+	var out interface{}
+	if _, err := a.post(endpoint, payload, nil, &out); err != nil {
+		return err
+	}
+	fmt.Println(out)
+	return nil
+}
 func stringEquals(str string, vals ...string) bool {
 	for _, v := range vals {
 		if str == v {

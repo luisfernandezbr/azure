@@ -44,11 +44,30 @@ func (a *API) FetchPullRequests(
 	}()
 	// ===========================================
 	func() {
-		err := a.paginate(endpoint, params, out)
-		errochan <- err
+		if err := a.paginate(endpoint, params, out); err != nil {
+			errochan <- err
+		}
 	}()
-	err := <-errochan
-	return err
+	return <-errochan
+}
+
+// UpdatePullRequest updates a PR, the fields supported are title and description
+func (a *API) UpdatePullRequest(projid, repoid, prid string, title, description string) error {
+	endpoint := fmt.Sprintf(`%s/_apis/git/repositories/%s/pullrequests/%s`,
+		url.PathEscape(projid),
+		url.PathEscape(repoid),
+		url.PathEscape(prid))
+	var payload struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+	}
+	payload.Title = title
+	payload.Description = description
+	var out interface{}
+	if _, err := a.patch(endpoint, payload, nil, &out); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (a *API) processPullRequests(value []pullRequestResponse,
