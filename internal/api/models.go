@@ -326,6 +326,7 @@ type threadsReponse struct {
 }
 
 type webhookPayload struct {
+	ID               string `json:"id,omitempty"` // readonly
 	ConsumerActionID string `json:"consumerActionId"`
 	ConsumerID       string `json:"consumerId"`
 	ConsumerInputs   struct {
@@ -334,12 +335,7 @@ type webhookPayload struct {
 	EventType       string `json:"eventType"`
 	PublisherID     string `json:"publisherId"`
 	PublisherInputs struct {
-		// AreaPath     string `json:"areaPath"`
-		// Repository   string `json:"repository"`
-		// Branch       string `json:"branch"`
-		// PushedBy     string `json:"pushedBy"`
 		ProjectID string `json:"projectId"`
-		// WorkItemType string `json:"workItemType"`
 	} `json:"publisherInputs"`
 	ResourceVersion string `json:"resourceVersion"`
 	Scope           int    `json:"scope"`

@@ -43,9 +43,10 @@ func (a *API) FetchPullRequests(
 		errochan <- nil
 	}()
 	// ===========================================
-	if err := a.paginate(endpoint, params, out); err != nil {
-		return err
-	}
+	func() {
+		err := a.paginate(endpoint, params, out)
+		errochan <- err
+	}()
 	err := <-errochan
 	return err
 }

@@ -84,3 +84,7 @@ func (a *API) post(endpoint string, data interface{}, params url.Values, out int
 	}
 	return a.client.Post(bytes.NewBuffer(b), &out, sdk.WithEndpoint(endpoint), sdk.WithGetQueryParameters(params), a.creds)
 }
+func (a *API) delete(endpoint string, params url.Values, out interface{}) (*sdk.HTTPResponse, error) {
+	params = ensureParams(params)
+	return a.client.Delete(out, sdk.WithEndpoint(endpoint), sdk.WithGetQueryParameters(params), a.creds)
+}
