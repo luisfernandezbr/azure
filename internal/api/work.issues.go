@@ -112,6 +112,7 @@ func (a *API) fetchIssues(projid string, ids []string, issueChannel chan<- *sdk.
 	var out struct {
 		Value []workItemResponse `json:"value"`
 	}
+	// no need to paginate, this is 200 at most at a time, look at FetchIssues
 	_, err := a.get(sdk.JoinURL(projid, endpoint), params, &out)
 	if err != nil {
 		return err

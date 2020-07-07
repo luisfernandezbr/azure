@@ -12,25 +12,54 @@ import (
 	"github.com/pinpt/agent.next/sdk"
 )
 
-func (a *API) fetchChangeLog(itemtype, projid, issueid string) (changelogs []sdk.WorkIssueChangeLog, latestChange time.Time, err error) {
+func (a *API) fetchChangeLog(itemtype, projid, issueid string) ([]sdk.WorkIssueChangeLog, time.Time, error) {
+
+	sdk.LogInfo(a.logger, "fetching issues changelogs for project", "project_id", projid)
 
 	params := url.Values{}
 	params.Set("$top", "200")
 	endpoint := fmt.Sprintf("_apis/wit/workItems/%s/updates", url.PathEscape(issueid))
 
-	var out struct {
-		Value []changelogResponse `json:"value"`
-	}
+	var changelogs []sdk.WorkIssueChangeLog
+	var latestChange time.Time
 
-	if _, err := a.get(sdk.JoinURL(projid, endpoint), params, &out); err != nil {
+	out := make(chan objects)
+	errochan := make(chan error)
+	go func() {
+		for object := range out {
+			var value []changelogResponse
+			if err := object.Unmarshal(&value); err != nil {
+				errochan <- err
+				return
+			}
+			changelogs = append(changelogs, a.processChangelogs(value)...)
+		}
+		errochan <- nil
+	}()
+	// ===========================================
+	go func() {
+		err := a.paginate(sdk.JoinURL(projid, endpoint), params, out)
+		if err != nil {
+			errochan <- err
+		}
+	}()
+	if err := <-errochan; err != nil {
 		return nil, time.Time{}, err
 	}
-
-	if len(out.Value) == 0 {
-		return
+	sort.Slice(changelogs, func(i int, j int) bool {
+		return changelogs[i].CreatedDate.Epoch < changelogs[j].CreatedDate.Epoch
+	})
+	if len(changelogs) > 0 {
+		last := changelogs[len(changelogs)-1]
+		latestChange = sdk.DateFromEpoch(last.CreatedDate.Epoch)
 	}
+	return changelogs, latestChange, nil
+}
+
+func (a *API) processChangelogs(response []changelogResponse) []sdk.WorkIssueChangeLog {
+	var changelogs []sdk.WorkIssueChangeLog
 	previousState := ""
-	for i, changelog := range out.Value {
+	for i, changelog := range response {
 		if changelog.Fields == nil {
 			continue
 		}
@@ -77,14 +106,7 @@ func (a *API) fetchChangeLog(itemtype, projid, issueid string) (changelogs []sdk
 			}
 		}
 	}
-	sort.Slice(changelogs, func(i int, j int) bool {
-		return changelogs[i].CreatedDate.Epoch < changelogs[j].CreatedDate.Epoch
-	})
-	if len(changelogs) > 0 {
-		last := changelogs[len(changelogs)-1]
-		latestChange = sdk.DateFromEpoch(last.CreatedDate.Epoch)
-	}
-	return
+	return changelogs
 }
 
 func changelogCreateParentField(changelog *changelogResponse) {
