@@ -51,7 +51,7 @@ func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
 	a := api.New(g.logger, client, customerID, g.refType, concurr, basicAuth)
 
 	if strings.HasPrefix(payload.EventType, "workitem.") {
-		return g.handleWorkWebHooks(payload.EventType, rawPayload, pipe, a)
+		return g.handleWorkWebHooks(customerID, webhook.IntegrationInstanceID(), payload.EventType, rawPayload, pipe, a)
 	}
 	return g.handleSourceCodeWebHooks(payload.EventType, pipe, a)
 }
@@ -59,7 +59,21 @@ func (g *AzureIntegration) handleSourceCodeWebHooks(eventType string, pipe sdk.P
 	return nil
 }
 
-func (g *AzureIntegration) handleWorkWebHooks(eventType string, rawPayload []byte, pipe sdk.Pipe, a *api.API) error {
+func (g *AzureIntegration) handleWorkWebHooks(customerID, intID, eventType string, rawPayload []byte, pipe sdk.Pipe, a *api.API) error {
+
+	var data webhookPayloadCreatedDeleted
+	if err := json.Unmarshal(rawPayload, &data); err != nil {
+		return err
+	}
+
+	if eventType == "workitem.deleted" {
+		itemID := fmt.Sprint(data.Resource.ID)
+		active := false
+		update := sdk.WorkIssueUpdate{}
+		update.Set.Active = &active
+		obj := sdk.NewWorkIssueUpdate(customerID, intID, itemID, g.refType, update)
+		return pipe.Write(obj)
+	}
 
 	errorchan := make(chan error)
 	issueChannel := make(chan *sdk.WorkIssue)
@@ -81,12 +95,8 @@ func (g *AzureIntegration) handleWorkWebHooks(eventType string, rawPayload []byt
 		}
 	}()
 
-	var data webhookPayloadCreatedDeleted
-	if err := json.Unmarshal(rawPayload, &data); err != nil {
-		return err
-	}
 	var itemID string
-	if eventType == "workitem.created" || eventType == "workitem.deleted" {
+	if eventType == "workitem.created" {
 		itemID = fmt.Sprint(data.Resource.ID)
 	} else {
 		itemID = fmt.Sprint(data.Resource.WorkItemId)

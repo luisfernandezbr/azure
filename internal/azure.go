@@ -11,12 +11,11 @@ import (
 
 // AzureIntegration is an integration for Azure
 type AzureIntegration struct {
-	logger  sdk.Logger
-	config  sdk.Config
-	manager sdk.Manager
-	refType string
-
-	graphQL    sdk.GraphQLClient
+	logger     sdk.Logger
+	config     sdk.Config
+	manager    sdk.Manager
+	refType    string
+	customerID string
 	httpClient sdk.HTTPClient
 }
 
