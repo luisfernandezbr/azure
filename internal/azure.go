@@ -3,7 +3,6 @@ package internal
 import (
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/pinpt/agent.next.azure/internal/api"
@@ -87,11 +86,10 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	sdk.LogDebug(g.logger, "export starting")
 	// Config is any customer specific configuration for this customer
 	config := export.Config()
-	instance := sdk.NewInstance(config, state, pipe, customerID, export.IntegrationInstanceID())
-	if err := g.Enroll(*instance); err != nil {
-		return err
-	}
-	os.Exit(1)
+	// instance := sdk.NewInstance(config, state, pipe, customerID, export.IntegrationInstanceID())
+	// if err := g.Enroll(*instance); err != nil {
+	// 	return err
+	// }
 
 	auth := config.APIKeyAuth
 	if auth == nil {
@@ -130,6 +128,12 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	issueChannel := make(chan *sdk.WorkIssue, concurr)
 	go func() {
 		for each := range issueChannel {
+			pipe.Write(each)
+		}
+	}()
+	issueCommentChannel := make(chan *sdk.WorkIssueComment, concurr)
+	go func() {
+		for each := range issueCommentChannel {
 			pipe.Write(each)
 		}
 	}()
@@ -177,7 +181,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 		if err := a.FetchSprints(proj.RefID, ids, sprintChannel); err != nil {
 			return fmt.Errorf("error fetching sprints. err: %v", err)
 		}
-		if err := a.FetchIssues(proj.RefID, updated, issueChannel); err != nil {
+		if err := a.FetchIssues(proj.RefID, updated, issueChannel, issueCommentChannel); err != nil {
 			return fmt.Errorf("error fetching issues. err: %v", err)
 		}
 		state.Set("updated_"+proj.RefID, time.Now().Format(time.RFC3339Nano))

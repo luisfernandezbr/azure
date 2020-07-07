@@ -13,7 +13,7 @@ import (
 const whereDateFormat = `01/02/2006 15:04:05Z`
 
 // FetchIssues gets issues from project id
-func (a *API) FetchIssues(projid string, updated time.Time, issueChannel chan<- *sdk.WorkIssue) error {
+func (a *API) FetchIssues(projid string, updated time.Time, issueChannel chan<- *sdk.WorkIssue, issueCommentChannel chan<- *sdk.WorkIssueComment) error {
 
 	sdk.LogInfo(a.logger, "fetching issues for project", "project_id", projid)
 
@@ -35,7 +35,7 @@ func (a *API) FetchIssues(projid string, updated time.Time, issueChannel chan<- 
 	var items []string
 	for i, item := range out.WorkItems {
 		if i != 0 && (i%200) == 0 {
-			err := a.fetchIssues(projid, items, issueChannel)
+			err := a.fetchIssues(projid, items, issueChannel, issueCommentChannel)
 			if err != nil {
 				return err
 			}
@@ -43,7 +43,7 @@ func (a *API) FetchIssues(projid string, updated time.Time, issueChannel chan<- 
 		}
 		items = append(items, fmt.Sprint(item.ID))
 	}
-	err := a.fetchIssues(projid, items, issueChannel)
+	err := a.fetchIssues(projid, items, issueChannel, issueCommentChannel)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func stringEquals(str string, vals ...string) bool {
 	return false
 }
 
-func (a *API) fetchIssues(projid string, ids []string, issueChannel chan<- *sdk.WorkIssue) error {
+func (a *API) fetchIssues(projid string, ids []string, issueChannel chan<- *sdk.WorkIssue, issueCommentChannel chan<- *sdk.WorkIssueComment) error {
 
 	sdk.LogInfo(a.logger, "fetching issues", "project_id", projid, "count", len(ids))
 
@@ -178,6 +178,9 @@ func (a *API) fetchIssues(projid string, ids []string, issueChannel chan<- *sdk.
 			sdk.ConvertTimeToDateModel(updatedDate, &issue.UpdatedDate)
 			issueChannel <- issue
 			return nil
+		})
+		async.Do(func() error {
+			return a.fetchComments(projid, fmt.Sprint(item.ID), issueCommentChannel)
 		})
 	}
 

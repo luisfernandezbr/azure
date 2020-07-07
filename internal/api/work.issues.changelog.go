@@ -16,7 +16,7 @@ func (a *API) fetchChangeLog(itemtype, projid, issueid string) (changelogs []sdk
 
 	params := url.Values{}
 	params.Set("$top", "200")
-	endpoint := fmt.Sprintf(`_apis/wit/workItems/%s/updates`, url.PathEscape(issueid))
+	endpoint := fmt.Sprintf("_apis/wit/workItems/%s/updates", url.PathEscape(issueid))
 
 	var out struct {
 		Value []changelogResponse `json:"value"`

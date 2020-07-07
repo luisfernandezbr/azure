@@ -8,6 +8,8 @@ import (
 type pageResponse struct {
 	Count int64   `json:"count"`
 	Value objects `json:"value"`
+	// comments don't have a "value" property, oy vey
+	Comments objects `json:"comments"`
 }
 
 type objects []map[string]interface{}
@@ -339,4 +341,39 @@ type webhookPayload struct {
 	} `json:"publisherInputs"`
 	ResourceVersion string `json:"resourceVersion"`
 	Scope           int    `json:"scope"`
+}
+type issueCommentReponse struct {
+	CreatedBy struct {
+		Links struct {
+			Avatar struct {
+				Href string `json:"href"`
+			} `json:"avatar"`
+		} `json:"_links"`
+		Descriptor  string `json:"descriptor"`
+		DisplayName string `json:"displayName"`
+		ID          string `json:"id"`
+		ImageURL    string `json:"imageUrl"`
+		UniqueName  string `json:"uniqueName"`
+		URL         string `json:"url"`
+	} `json:"createdBy"`
+	CreatedDate time.Time `json:"createdDate"`
+	ID          int       `json:"id"`
+	ModifiedBy  struct {
+		Links struct {
+			Avatar struct {
+				Href string `json:"href"`
+			} `json:"avatar"`
+		} `json:"_links"`
+		Descriptor  string `json:"descriptor"`
+		DisplayName string `json:"displayName"`
+		ID          string `json:"id"`
+		ImageURL    string `json:"imageUrl"`
+		UniqueName  string `json:"uniqueName"`
+		URL         string `json:"url"`
+	} `json:"modifiedBy"`
+	ModifiedDate time.Time `json:"modifiedDate"`
+	Text         string    `json:"text"`
+	URL          string    `json:"url"`
+	Version      int       `json:"version"`
+	WorkItemID   int       `json:"workItemId"`
 }

@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/url"
 	"strconv"
 
@@ -13,12 +14,13 @@ import (
 
 // API the api object
 type API struct {
-	customerID  string
-	refType     string
-	client      sdk.HTTPClient
-	concurrency int
-	logger      sdk.Logger
-	creds       sdk.WithHTTPOption
+	customerID    string
+	integrationID string
+	refType       string
+	client        sdk.HTTPClient
+	concurrency   int
+	logger        sdk.Logger
+	creds         sdk.WithHTTPOption
 }
 
 // New creates a new instance of the api object
@@ -62,7 +64,16 @@ func (a *API) paginate(endpoint string, params url.Values, out chan<- objects) e
 			return err
 		}
 		if page.Count > 0 {
-			out <- page.Value
+			if len(page.Value) > 0 {
+				out <- page.Value
+			} else if len(page.Comments) > 0 {
+				out <- page.Comments
+			} else {
+				var out interface{}
+				a.get(endpoint, params, &out)
+				sdk.LogError(a.logger, "response is not standard", "resp", sdk.Stringify(out))
+				return errors.New("response is not standard")
+			}
 		}
 		if page.Count < int64(maxPage) {
 			return nil
