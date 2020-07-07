@@ -51,12 +51,6 @@ func (g *AzureIntegration) Dismiss(instance sdk.Instance) error {
 	return nil
 }
 
-// Mutation is called when a mutation is received on behalf of the integration
-func (g *AzureIntegration) Mutation(mutation sdk.Mutation) error {
-	sdk.LogInfo(g.logger, "mutation not implemented")
-	return nil
-}
-
 // Stop is called when the integration is shutting down for cleanup
 func (g *AzureIntegration) Stop() error {
 	sdk.LogInfo(g.logger, "stopping")
@@ -139,7 +133,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 
 	workUsermap := map[string]*sdk.WorkUser{}
 	sourcecodeUsermap := map[string]*sdk.SourceCodeUser{}
-	a := api.New(g.logger, client, customerID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+	a := api.New(g.logger, client, state, customerID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
 	projects, err := a.FetchProjects()
 	if err != nil {
 		return fmt.Errorf("error fetching projects. err: %v", err)

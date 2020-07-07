@@ -10,7 +10,7 @@ import (
 
 var pullRequestCommentVotedReg = regexp.MustCompile(`(.+?)( voted )(-10|-5|0|5|10.*)`)
 
-func (a *API) sendPullRequestComment(repoRefID string, pr pullRequestResponse, prCommentsChannel chan<- *sdk.SourceCodePullRequestComment, prReviewsChannel chan<- *sdk.SourceCodePullRequestReview) error {
+func (a *API) sendPullRequestComment(projid string, repoRefID string, pr pullRequestResponse, prCommentsChannel chan<- *sdk.SourceCodePullRequestComment, prReviewsChannel chan<- *sdk.SourceCodePullRequestReview) error {
 
 	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/pullRequests/%d/threads`, url.PathEscape(pr.Repository.ID), pr.PullRequestID)
 	var out struct {
@@ -19,15 +19,17 @@ func (a *API) sendPullRequestComment(repoRefID string, pr pullRequestResponse, p
 	if _, err := a.get(endpoint, nil, &out); err != nil {
 		return fmt.Errorf("error fetching threads for PR, skipping. pr_id: %v. repo_id: %v. err: %v", pr.PullRequestID, pr.Repository.ID, err)
 	}
+	prrefid := a.createPullRequestID(projid, repoRefID, pr.PullRequestID)
 	for _, thread := range out.Value {
 		for _, comment := range thread.Comments {
 			// comment type "text" means it's a real user instead of system
 			if comment.CommentType == "text" {
 				refid := fmt.Sprintf("%d_%d", thread.ID, comment.ID)
+
 				c := &sdk.SourceCodePullRequestComment{
 					Body:          comment.Content,
 					CustomerID:    a.customerID,
-					PullRequestID: sdk.NewSourceCodePullRequestID(a.customerID, a.refType, fmt.Sprint(pr.PullRequestID), repoRefID),
+					PullRequestID: sdk.NewSourceCodePullRequestID(a.customerID, a.refType, prrefid, repoRefID),
 					RefID:         refid,
 					RefType:       a.refType,
 					RepoID:        sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
@@ -58,7 +60,7 @@ func (a *API) sendPullRequestComment(repoRefID string, pr pullRequestResponse, p
 					refid := sdk.Hash(pr.PullRequestID, thread.ID, comment.ID)
 					review := &sdk.SourceCodePullRequestReview{
 						CustomerID:    a.customerID,
-						PullRequestID: sdk.NewSourceCodePullRequestID(a.customerID, fmt.Sprintf("%d", pr.PullRequestID), a.refType, repoRefID),
+						PullRequestID: sdk.NewSourceCodePullRequestID(a.customerID, prrefid, a.refType, repoRefID),
 						RefID:         refid,
 						RefType:       a.refType,
 						RepoID:        sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),

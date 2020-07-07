@@ -227,7 +227,7 @@ type pullRequestResponse struct {
 	} `json:"lastMergeTargetCommit"`
 	MergeID       string             `json:"mergeId"`
 	MergeStatus   string             `json:"mergeStatus"`
-	PullRequestID int64              `json:"pullRequestId"`
+	PullRequestID int                `json:"pullRequestId"`
 	Repository    reposResponseLight `json:"repository"`
 	Reviewers     []struct {
 		DisplayName string `json:"displayName"`

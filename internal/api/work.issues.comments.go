@@ -7,9 +7,9 @@ import (
 	"github.com/pinpt/agent.next/sdk"
 )
 
-func (a *API) fetchComments(projid, issueid string, issueCommentChannel chan<- *sdk.WorkIssueComment) error {
+func (a *API) fetchComments(projid string, issueid int, issueCommentChannel chan<- *sdk.WorkIssueComment) error {
 
-	endpoint := fmt.Sprintf("_apis/wit/workItems/%s/comments", url.PathEscape(issueid))
+	endpoint := fmt.Sprintf("_apis/wit/workItems/%s/comments", url.PathEscape(fmt.Sprint(issueid)))
 	params := url.Values{}
 	params.Set("$top", "200")
 	params.Set("api-version", "5.1-preview")
@@ -28,7 +28,7 @@ func (a *API) fetchComments(projid, issueid string, issueCommentChannel chan<- *
 					Body:                  raw.Text,
 					CustomerID:            a.customerID,
 					IntegrationInstanceID: &a.integrationID,
-					IssueID:               sdk.NewWorkIssueID(a.customerID, issueid, a.refType),
+					IssueID:               sdk.NewWorkIssueID(a.customerID, a.createIssueID(projid, issueid), a.refType),
 					ProjectID:             sdk.NewWorkProjectID(a.customerID, projid, a.refType),
 					RefID:                 fmt.Sprint(raw.ID),
 					RefType:               a.refType,

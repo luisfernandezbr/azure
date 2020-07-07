@@ -7,7 +7,7 @@ import (
 	"github.com/pinpt/agent.next/sdk"
 )
 
-func (a *API) sendPullRequestCommit(repoRefID string, p pullRequestResponseWithShas, prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit) error {
+func (a *API) sendPullRequestCommit(projid string, repoRefID string, p pullRequestResponseWithShas, prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit) error {
 	sha := p.commitSHAs[len(p.commitSHAs)-1]
 	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/commits/%s`, url.PathEscape(p.Repository.ID), url.PathEscape(sha))
 	var out singleCommitResponse
@@ -17,6 +17,7 @@ func (a *API) sendPullRequestCommit(repoRefID string, p pullRequestResponseWithS
 	if _, err := a.get(endpoint, params, &out); err != nil {
 		return err
 	}
+	prrefid := a.createPullRequestID(projid, repoRefID, p.PullRequestID)
 	commit := &sdk.SourceCodePullRequestCommit{
 		Additions:      out.ChangeCounts.Add,
 		AuthorRefID:    out.Push.PushedBy.ID,
@@ -25,7 +26,7 @@ func (a *API) sendPullRequestCommit(repoRefID string, p pullRequestResponseWithS
 		CustomerID:     a.customerID,
 		Deletions:      out.ChangeCounts.Delete,
 		Message:        out.Comment,
-		PullRequestID:  sdk.NewSourceCodePullRequestID(a.customerID, fmt.Sprint(p.PullRequestID), a.refType, repoRefID),
+		PullRequestID:  sdk.NewSourceCodePullRequestID(a.customerID, prrefid, a.refType, repoRefID),
 		RefID:          sha,
 		RefType:        a.refType,
 		RepoID:         sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
@@ -37,7 +38,7 @@ func (a *API) sendPullRequestCommit(repoRefID string, p pullRequestResponseWithS
 	return nil
 }
 
-func (a *API) sendPullRequestCommits(pr pullRequestResponseWithShas, prsChannel chan<- *sdk.SourceCodePullRequest, prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit) error {
+func (a *API) sendPullRequestCommits(projid string, pr pullRequestResponseWithShas, prsChannel chan<- *sdk.SourceCodePullRequest, prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit) error {
 	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/pullRequests/%d/commits`, url.PathEscape(pr.Repository.ID), pr.PullRequestID)
 	var out struct {
 		Value []commitsResponseLight `json:"value"`
@@ -51,11 +52,11 @@ func (a *API) sendPullRequestCommits(pr pullRequestResponseWithShas, prsChannel 
 		for _, commit := range out.Value {
 			pr.commitSHAs = append(pr.commitSHAs, commit.CommitID)
 			pr := pr
-			if err := a.sendPullRequestCommit(pr.Repository.ID, pr, prCommitsChannel); err != nil {
+			if err := a.sendPullRequestCommit(projid, pr.Repository.ID, pr, prCommitsChannel); err != nil {
 				return err
 			}
 		}
-		a.sendPullRequest(pr.Repository.ID, pr, prsChannel)
+		a.sendPullRequest(projid, pr.Repository.ID, pr, prsChannel)
 	}
 
 	return nil

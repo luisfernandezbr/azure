@@ -51,7 +51,7 @@ func (a *API) FetchAllIssues(projid string, updated time.Time, issueChannel chan
 }
 
 // CreateIssue creates an issue
-func (a *API) CreateIssue(obj sdk.WorkIssueCreateMutation) error {
+func (a *API) CreateIssue(obj *sdk.WorkIssueCreateMutation) error {
 	endpoint := fmt.Sprintf("%s/_apis/wit/workitems/%s", obj.ProjectRefID, *obj.Type.Name)
 	type item struct {
 		OP    string `json:"op"`
@@ -87,6 +87,83 @@ func (a *API) CreateIssue(obj sdk.WorkIssueCreateMutation) error {
 	fmt.Println(out)
 	return nil
 }
+
+// UpdateIssue updates an issue
+func (a *API) UpdateIssue(refid string, obj *sdk.WorkIssueUpdateMutation) error {
+	projectid, issueid, err := a.FetchIssueProjectRefs(refid)
+	if err != nil {
+		return err
+	}
+	endpoint := fmt.Sprintf("%s/_apis/wit/workitems/%s", projectid, fmt.Sprint(issueid))
+	type item struct {
+		OP    string `json:"op"`
+		Path  string `json:"path"`
+		Value string `json:"value"`
+	}
+	var payload []item
+
+	if title := obj.Set.Title; title != nil {
+		payload = append(payload, item{
+			OP:    "add",
+			Path:  "/fields/System.Title",
+			Value: *title,
+		})
+	}
+	if status := obj.Set.Status; status != nil {
+		payload = append(payload, item{
+			OP:    "add",
+			Path:  "/fields/System.State",
+			Value: *status.Name,
+		})
+
+	}
+	if priority := obj.Set.Priority; priority != nil {
+		payload = append(payload, item{
+			OP:    "add",
+			Path:  "/fields/Microsoft.VSTS.Common.Priority",
+			Value: *priority.Name,
+		})
+	}
+	if resolution := obj.Set.Resolution; resolution != nil {
+		payload = append(payload, item{
+			OP:    "add",
+			Path:  "/fields/Microsoft.VSTS.Common.ResolvedReason",
+			Value: *resolution.Name,
+		})
+	}
+	if epic := obj.Set.Epic; epic != nil {
+		payload = append(payload, item{
+			OP:    "add",
+			Path:  "/fields/System.IterationPath",
+			Value: *epic.Name,
+		})
+	}
+	if assigned := obj.Set.AssigneeRefID; assigned != nil {
+		payload = append(payload, item{
+			OP:    "add",
+			Path:  "/fields/System.AssignedTo",
+			Value: sdk.Stringify(usersResponse{ID: *assigned}),
+		})
+	}
+	if obj.Unset.Assignee {
+		payload = append(payload, item{
+			OP:   "remove",
+			Path: "/fields/System.AssignedTo",
+		})
+	}
+	if obj.Unset.Epic {
+		payload = append(payload, item{
+			OP:   "remove",
+			Path: "/fields/System.IterationPath",
+		})
+	}
+	var out interface{}
+	if _, err := a.post(endpoint, payload, nil, &out); err != nil {
+		return err
+	}
+	return nil
+}
+
 func stringEquals(str string, vals ...string) bool {
 	for _, v := range vals {
 		if str == v {
@@ -96,7 +173,13 @@ func stringEquals(str string, vals ...string) bool {
 	return false
 }
 
+// FetchIssues gets all the issues from the ids array
 func (a *API) FetchIssues(projid string, ids []string, issueChannel chan<- *sdk.WorkIssue, issueCommentChannel chan<- *sdk.WorkIssueComment) error {
+
+	// flush the data once in a while
+	if err := a.state.Flush(); err != nil {
+		return err
+	}
 
 	sdk.LogInfo(a.logger, "fetching issues", "project_id", projid, "count", len(ids))
 
@@ -152,7 +235,7 @@ func (a *API) FetchIssues(projid string, ids []string, issueChannel chan<- *sdk.
 				Identifier:    fmt.Sprintf("%s-%d", fields.TeamProject, item.ID),
 				Priority:      fmt.Sprint(fields.Priority),
 				ProjectID:     sdk.NewWorkProjectID(a.customerID, projid, a.refType),
-				RefID:         fmt.Sprint(item.ID),
+				RefID:         a.createIssueID(projid, item.ID),
 				RefType:       a.refType,
 				ReporterRefID: fields.CreatedBy.ID,
 				Resolution:    fields.ResolvedReason, //itemStateName(fields.ResolvedReason, item.Fields.WorkItemType),
@@ -169,7 +252,7 @@ func (a *API) FetchIssues(projid string, ids []string, issueChannel chan<- *sdk.
 			sdk.ConvertTimeToDateModel(fields.DueDate, &issue.DueDate)
 
 			var updatedDate time.Time
-			if issue.ChangeLog, updatedDate, err = a.fetchChangeLog(fields.WorkItemType, projid, issue.RefID); err != nil {
+			if issue.ChangeLog, updatedDate, err = a.fetchChangeLog(fields.WorkItemType, projid, item.ID); err != nil {
 				return err
 			}
 			// this should only happen if the changelog is empty, which should only happen when an issue is created and not modified,
@@ -181,7 +264,7 @@ func (a *API) FetchIssues(projid string, ids []string, issueChannel chan<- *sdk.
 			return nil
 		})
 		async.Do(func() error {
-			return a.fetchComments(projid, fmt.Sprint(item.ID), issueCommentChannel)
+			return a.fetchComments(projid, item.ID, issueCommentChannel)
 		})
 	}
 

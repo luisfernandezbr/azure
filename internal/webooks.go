@@ -48,7 +48,7 @@ func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
 	customerID := webhook.CustomerID()
 	rawPayload := webhook.Bytes()
 
-	a := api.New(g.logger, client, customerID, g.refType, concurr, basicAuth)
+	a := api.New(g.logger, client, webhook.State(), customerID, g.refType, concurr, basicAuth)
 
 	if strings.HasPrefix(payload.EventType, "workitem.") {
 		return g.handleWorkWebHooks(customerID, webhook.IntegrationInstanceID(), payload.EventType, rawPayload, pipe, a)
@@ -119,7 +119,7 @@ func (g *AzureIntegration) registerWebhook(instance sdk.Instance, concurr int64)
 	auth := instance.Config().APIKeyAuth
 
 	client := g.manager.HTTPManager().New(auth.URL, nil)
-	a := api.New(g.logger, client, customerID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+	a := api.New(g.logger, client, instance.State(), customerID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
 
 	// fetch projects
 	projects, err := a.FetchProjects()

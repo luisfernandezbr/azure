@@ -12,13 +12,13 @@ import (
 	"github.com/pinpt/agent.next/sdk"
 )
 
-func (a *API) fetchChangeLog(itemtype, projid, issueid string) ([]sdk.WorkIssueChangeLog, time.Time, error) {
+func (a *API) fetchChangeLog(itemtype, projid string, issueid int) ([]sdk.WorkIssueChangeLog, time.Time, error) {
 
-	sdk.LogInfo(a.logger, "fetching issues changelogs for project", "project_id", projid)
+	sdk.LogInfo(a.logger, "fetching issues changelogs for project", "project_id", projid, "issue_id", issueid)
 
 	params := url.Values{}
 	params.Set("$top", "200")
-	endpoint := fmt.Sprintf("_apis/wit/workItems/%s/updates", url.PathEscape(issueid))
+	endpoint := fmt.Sprintf("_apis/wit/workItems/%s/updates", url.PathEscape(fmt.Sprint(issueid)))
 
 	var changelogs []sdk.WorkIssueChangeLog
 	var latestChange time.Time

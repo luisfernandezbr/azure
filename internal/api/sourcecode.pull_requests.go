@@ -52,17 +52,21 @@ func (a *API) FetchPullRequests(
 }
 
 // UpdatePullRequest updates a PR, the fields supported are title and description
-func (a *API) UpdatePullRequest(projid, repoid, prid string, title, description string) error {
+func (a *API) UpdatePullRequest(refid string, v *sdk.SourcecodePullRequestUpdateMutation) error {
+	projid, repoid, prid, err := a.FetchPullRequestRepoProjectRefs(refid)
+	if err != nil {
+		return err
+	}
 	endpoint := fmt.Sprintf(`%s/_apis/git/repositories/%s/pullrequests/%s`,
 		url.PathEscape(projid),
 		url.PathEscape(repoid),
-		url.PathEscape(prid))
+		url.PathEscape(fmt.Sprint(prid)))
 	var payload struct {
 		Title       string `json:"title"`
 		Description string `json:"description"`
 	}
-	payload.Title = title
-	payload.Description = description
+	payload.Title = *v.Set.Title
+	payload.Description = *v.Set.Description
 	var out interface{}
 	if _, err := a.patch(endpoint, payload, nil, &out); err != nil {
 		return err
@@ -106,7 +110,7 @@ func (a *API) processPullRequests(value []pullRequestResponse,
 		async.Do(func() error {
 			pr.SourceBranch = strings.TrimPrefix(p.SourceBranch, "refs/heads/")
 			pr.TargetBranch = strings.TrimPrefix(p.TargetBranch, "refs/heads/")
-			if err := a.sendPullRequestCommits(pr, prsChannel, prCommitsChannel); err != nil {
+			if err := a.sendPullRequestCommits(projid, pr, prsChannel, prCommitsChannel); err != nil {
 				return fmt.Errorf("error fetching commits for PR, skipping pr_id:%v repo_id:%v err:%v", pr.PullRequestID, pr.Repository.ID, err)
 			}
 			return nil
@@ -121,20 +125,21 @@ func (a *API) processPullRequests(value []pullRequestResponse,
 	for _, p := range pullrequestcomments {
 		pr := p
 		async.Do(func() error {
-			return a.sendPullRequestComment(repoid, pr, prCommentsChannel, prReviewsChannel)
+			return a.sendPullRequestComment(projid, repoid, pr, prCommentsChannel, prReviewsChannel)
 		})
 	}
 	return async.Wait()
 }
 
-func (a *API) sendPullRequest(repoRefID string, p pullRequestResponseWithShas, prsChannel chan<- *sdk.SourceCodePullRequest) {
+func (a *API) sendPullRequest(projid string, repoRefID string, p pullRequestResponseWithShas, prsChannel chan<- *sdk.SourceCodePullRequest) {
 
+	prrefid := a.createPullRequestID(projid, repoRefID, p.PullRequestID)
 	pr := &sdk.SourceCodePullRequest{
 		BranchName:     p.SourceBranch,
 		CreatedByRefID: p.CreatedBy.ID,
 		CustomerID:     a.customerID,
 		Description:    `<div class="source-azure">` + p.Description + "</div>",
-		RefID:          fmt.Sprintf("%d", p.PullRequestID),
+		RefID:          prrefid,
 		RefType:        a.refType,
 		RepoID:         sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
 		Title:          p.Title,
