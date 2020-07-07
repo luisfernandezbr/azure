@@ -15,11 +15,9 @@ var eventTypes = []string{
 	"git.pullrequest.merged",  // Pull request merge commit created
 	"git.pullrequest.updated", // Pull request updated
 
-	"workitem.created",   // Work item created
-	"workitem.deleted",   // Work item deleted
-	"workitem.restored",  // Work item restored
-	"workitem.updated",   // Work item updated
-	"workitem.commented", // Work item commented on
+	"workitem.created", // Work item created
+	"workitem.deleted", // Work item deleted
+	"workitem.updated", // Work item updated
 }
 
 // RemoveAllWebHooks gets the repos from a project

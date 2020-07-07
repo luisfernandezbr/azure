@@ -52,12 +52,6 @@ func (g *AzureIntegration) Dismiss(instance sdk.Instance) error {
 	return nil
 }
 
-// WebHook is called when a webhook is received on behalf of the integration
-func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
-	sdk.LogInfo(g.logger, "webhook not implemented")
-	return nil
-}
-
 // Mutation is called when a mutation is received on behalf of the integration
 func (g *AzureIntegration) Mutation(mutation sdk.Mutation) error {
 	sdk.LogInfo(g.logger, "mutation not implemented")
@@ -181,7 +175,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 		if err := a.FetchSprints(proj.RefID, ids, sprintChannel); err != nil {
 			return fmt.Errorf("error fetching sprints. err: %v", err)
 		}
-		if err := a.FetchIssues(proj.RefID, updated, issueChannel, issueCommentChannel); err != nil {
+		if err := a.FetchAllIssues(proj.RefID, updated, issueChannel, issueCommentChannel); err != nil {
 			return fmt.Errorf("error fetching issues. err: %v", err)
 		}
 		state.Set("updated_"+proj.RefID, time.Now().Format(time.RFC3339Nano))

@@ -1,12 +1,106 @@
 package internal
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/pinpt/agent.next.azure/internal/api"
 	"github.com/pinpt/agent.next/sdk"
 )
+
+type webookPayload struct {
+	EventType string `json:"eventType"`
+}
+type webhookPayloadCreatedDeleted struct {
+	Resource struct {
+		ID         int `json:"id"`
+		WorkItemId int `json:"workItemId"`
+	} `json:"resource"`
+	ResourceContainers struct {
+		Project struct {
+			ID string `json:"id"`
+		} `json:"project"`
+	} `json:"resourceContainers"`
+}
+
+// WebHook is called when a webhook is received on behalf of the integration
+func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
+	var payload webookPayload
+	if err := json.Unmarshal(webhook.Bytes(), &payload); err != nil {
+		return err
+	}
+
+	pipe := webhook.Pipe()
+	config := webhook.Config()
+	ok, concurr := config.GetInt("concurrency")
+	if !ok {
+		concurr = 10
+	}
+	auth := config.APIKeyAuth
+	if auth == nil {
+		return errors.New("Missing --apikey_auth")
+	}
+	basicAuth := sdk.WithBasicAuth("", auth.APIKey)
+	client := g.manager.HTTPManager().New(auth.URL, nil)
+	customerID := webhook.CustomerID()
+	rawPayload := webhook.Bytes()
+
+	a := api.New(g.logger, client, customerID, g.refType, concurr, basicAuth)
+
+	if strings.HasPrefix(payload.EventType, "workitem.") {
+		return g.handleWorkWebHooks(payload.EventType, rawPayload, pipe, a)
+	}
+	return g.handleSourceCodeWebHooks(payload.EventType, pipe, a)
+}
+func (g *AzureIntegration) handleSourceCodeWebHooks(eventType string, pipe sdk.Pipe, a *api.API) error {
+	return nil
+}
+
+func (g *AzureIntegration) handleWorkWebHooks(eventType string, rawPayload []byte, pipe sdk.Pipe, a *api.API) error {
+
+	errorchan := make(chan error)
+	issueChannel := make(chan *sdk.WorkIssue)
+	go func() {
+		for each := range issueChannel {
+			if err := pipe.Write(each); err != nil {
+				errorchan <- err
+				return
+			}
+		}
+	}()
+	issueCommentChannel := make(chan *sdk.WorkIssueComment)
+	go func() {
+		for each := range issueCommentChannel {
+			if err := pipe.Write(each); err != nil {
+				errorchan <- err
+				return
+			}
+		}
+	}()
+
+	var data webhookPayloadCreatedDeleted
+	if err := json.Unmarshal(rawPayload, &data); err != nil {
+		return err
+	}
+	var itemID string
+	if eventType == "workitem.created" || eventType == "workitem.deleted" {
+		itemID = fmt.Sprint(data.Resource.ID)
+	} else {
+		itemID = fmt.Sprint(data.Resource.WorkItemId)
+	}
+	projectID := data.ResourceContainers.Project.ID
+	go func() {
+		if err := a.FetchIssues(projectID, []string{itemID}, issueChannel, issueCommentChannel); err != nil {
+			errorchan <- err
+			return
+		}
+		errorchan <- nil
+	}()
+	return <-errorchan
+}
 
 func (g *AzureIntegration) registerWebhook(instance sdk.Instance, concurr int64) error {
 
