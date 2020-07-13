@@ -248,8 +248,8 @@ var changelogFields = map[string]changeLogFieldExtractor{
 		return sdk.WorkIssueChangeLogFieldIdentifier, oldvalue, newvalue
 	},
 	"System.IterationPath": func(item changelogField) (sdk.WorkIssueChangeLogField, string, string) {
-		oldvalue := sdk.NewWorkSprintID(item.customerID, changelogToString(item.OldValue), item.refType)
-		newvalue := sdk.NewWorkSprintID(item.customerID, changelogToString(item.NewValue), item.refType)
+		oldvalue := sdk.NewAgileSprintID(item.customerID, changelogToString(item.OldValue), item.refType)
+		newvalue := sdk.NewAgileSprintID(item.customerID, changelogToString(item.NewValue), item.refType)
 		return sdk.WorkIssueChangeLogFieldSprintIds, oldvalue, newvalue
 	},
 	"parent": func(item changelogField) (sdk.WorkIssueChangeLogField, string, string) {

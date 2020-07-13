@@ -6,7 +6,7 @@ import (
 	"github.com/pinpt/agent.next/sdk"
 )
 
-func (a *API) FetchSprints(projid string, teamids []string, sprintChannel chan<- *sdk.WorkSprint) error {
+func (a *API) FetchSprints(projid string, teamids []string, sprintChannel chan<- *sdk.AgileSprint) error {
 
 	sdk.LogInfo(a.logger, "fetching sprints", "project_id", projid)
 
@@ -21,7 +21,7 @@ func (a *API) FetchSprints(projid string, teamids []string, sprintChannel chan<-
 			return err
 		}
 		for _, r := range out.Value {
-			sprint := &sdk.WorkSprint{
+			sprint := &sdk.AgileSprint{
 				CustomerID: a.customerID,
 				// Goal is missing
 				Name:    r.Name,
@@ -30,13 +30,13 @@ func (a *API) FetchSprints(projid string, teamids []string, sprintChannel chan<-
 			}
 			switch r.Attributes.TimeFrame {
 			case "past":
-				sprint.Status = sdk.WorkSprintStatusClosed
+				sprint.Status = sdk.AgileSprintStatusClosed
 			case "current":
-				sprint.Status = sdk.WorkSprintStatusActive
+				sprint.Status = sdk.AgileSprintStatusActive
 			case "future":
-				sprint.Status = sdk.WorkSprintStatusFuture
+				sprint.Status = sdk.AgileSprintStatusFuture
 			default:
-				sprint.Status = sdk.WorkSprintStatus(4) // unset
+				sprint.Status = sdk.AgileSprintStatus(4) // unset
 			}
 			sdk.ConvertTimeToDateModel(r.Attributes.StartDate, &sprint.StartedDate)
 			sdk.ConvertTimeToDateModel(r.Attributes.FinishDate, &sprint.EndedDate)

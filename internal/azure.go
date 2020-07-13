@@ -124,7 +124,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 			pipe.Write(each)
 		}
 	}()
-	sprintChannel := make(chan *sdk.WorkSprint, concurr)
+	sprintChannel := make(chan *sdk.AgileSprint, concurr)
 	go func() {
 		for each := range sprintChannel {
 			pipe.Write(each)

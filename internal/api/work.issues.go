@@ -245,7 +245,7 @@ func (a *API) FetchIssues(projid string, ids []string, issueChannel chan<- *sdk.
 				Title:         fields.Title,
 				Type:          fields.WorkItemType,
 				URL:           item.Links.HTML.HREF,
-				SprintIds:     []string{sdk.NewWorkSprintID(a.customerID, fields.IterationPath, a.refType)},
+				SprintIds:     []string{sdk.NewAgileSprintID(a.customerID, fields.IterationPath, a.refType)},
 			}
 
 			sdk.ConvertTimeToDateModel(fields.CreatedDate, &issue.CreatedDate)
