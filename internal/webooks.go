@@ -130,7 +130,7 @@ func (g *AzureIntegration) registerWebhook(instance sdk.Instance, concurr int64)
 		return err
 	}
 	for _, proj := range projects {
-		url, err := g.manager.CreateWebHook(customerID, g.refType, integrationID, proj.RefID)
+		url, err := g.manager.WebHookManager().Create(customerID, integrationID, g.refType, proj.RefID, sdk.WebHookScopeProject)
 		if err != nil {
 			fmt.Println("err", err)
 			return err
