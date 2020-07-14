@@ -84,7 +84,6 @@ func (a *API) CreateIssue(obj *sdk.WorkIssueCreateMutation) error {
 	if _, err := a.post(endpoint, payload, nil, &out); err != nil {
 		return err
 	}
-	fmt.Println(out)
 	return nil
 }
 

@@ -4,20 +4,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/pinpt/agent.next.azure/internal/api"
 	"github.com/pinpt/agent.next/sdk"
 )
 
+const webhookVersion = "1" // change this to have the webhook uninstalled and reinstalled new
+
 type webookPayload struct {
 	EventType string `json:"eventType"`
 }
+
 type webhookPayloadCreatedDeleted struct {
 	Resource struct {
 		ID         int `json:"id"`
-		WorkItemId int `json:"workItemId"`
+		WorkItemID int `json:"workItemId"`
 	} `json:"resource"`
 	ResourceContainers struct {
 		Project struct {
@@ -35,6 +37,8 @@ func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
 
 	pipe := webhook.Pipe()
 	config := webhook.Config()
+	integrationID := webhook.IntegrationInstanceID()
+
 	ok, concurr := config.GetInt("concurrency")
 	if !ok {
 		concurr = 10
@@ -48,7 +52,7 @@ func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
 	customerID := webhook.CustomerID()
 	rawPayload := webhook.Bytes()
 
-	a := api.New(g.logger, client, webhook.State(), customerID, g.refType, concurr, basicAuth)
+	a := api.New(g.logger, client, webhook.State(), customerID, integrationID, g.refType, concurr, basicAuth)
 
 	if strings.HasPrefix(payload.EventType, "workitem.") {
 		return g.handleWorkWebHooks(customerID, webhook.IntegrationInstanceID(), payload.EventType, rawPayload, pipe, a)
@@ -99,7 +103,7 @@ func (g *AzureIntegration) handleWorkWebHooks(customerID, intID, eventType strin
 	if eventType == "workitem.created" {
 		itemID = fmt.Sprint(data.Resource.ID)
 	} else {
-		itemID = fmt.Sprint(data.Resource.WorkItemId)
+		itemID = fmt.Sprint(data.Resource.WorkItemID)
 	}
 	projectID := data.ResourceContainers.Project.ID
 	go func() {
@@ -112,34 +116,102 @@ func (g *AzureIntegration) handleWorkWebHooks(customerID, intID, eventType strin
 	return <-errorchan
 }
 
-func (g *AzureIntegration) registerWebhook(instance sdk.Instance, concurr int64) error {
+func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64) error {
 
 	customerID := instance.CustomerID()
 	integrationID := instance.IntegrationInstanceID()
+	state := instance.State()
 	auth := instance.Config().APIKeyAuth
 
 	client := g.manager.HTTPManager().New(auth.URL, nil)
-	a := api.New(g.logger, client, instance.State(), customerID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+	a := api.New(g.logger, client, instance.State(), customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
 
 	// fetch projects
 	projects, err := a.FetchProjects()
 	if err != nil {
 		return fmt.Errorf("error fetching projects. err: %v", err)
 	}
-	if err := a.RemoveAllWebHooks(concurr); err != nil {
-		return err
-	}
+	webhookManager := g.manager.WebHookManager()
+
 	for _, proj := range projects {
-		url, err := g.manager.WebHookManager().Create(customerID, integrationID, g.refType, proj.RefID, sdk.WebHookScopeProject)
-		if err != nil {
-			fmt.Println("err", err)
-			return err
-		}
-		if err := a.CreateWebhook(url, proj.RefID, concurr); err != nil {
-			return err
+		if webhookManager.Exists(customerID, integrationID, g.refType, proj.RefID, sdk.WebHookScopeProject) {
+			url, err := webhookManager.HookURL(customerID, integrationID, g.refType, proj.RefID, sdk.WebHookScopeProject)
+			if err != nil {
+				return err
+			}
+			// check and see if we need to upgrade our webhook
+			if strings.Contains(url, "&version="+webhookVersion) {
+				sdk.LogInfo(g.logger, "skipping web hook install since already installed")
+				continue
+			}
+			var removed bool
+			if removed, err = g.removeWebHook(webhookManager, a, state, customerID, integrationID, proj.RefID); err != nil {
+				return err
+			}
+			if !removed {
+				continue
+			}
 		}
 
+		url, err := webhookManager.Create(customerID, integrationID, g.refType, proj.RefID, sdk.WebHookScopeProject, "version="+webhookVersion)
+		if err != nil {
+			return err
+		}
+		// each project creates a bunch of webhooks, we need to store the ids of those in state so that we can delete them later
+		ids, err := a.CreateWebhook(url, proj.RefID)
+		if err != nil {
+			sdk.LogError(g.logger, "error creating webhook", "err", err)
+			webhookManager.Errored(customerID, integrationID, g.refType, proj.RefID, sdk.WebHookScopeProject, err)
+			continue
+		}
+		if err := state.Set("webhooks_"+proj.RefID, ids); err != nil {
+			return err
+		}
 	}
-	os.Exit(1)
+	return state.Flush()
+}
+
+func (g *AzureIntegration) unregisterWebHooks(instance sdk.Instance, concurr int64) error {
+	customerID := instance.CustomerID()
+	integrationID := instance.IntegrationInstanceID()
+	state := instance.State()
+	auth := instance.Config().APIKeyAuth
+
+	client := g.manager.HTTPManager().New(auth.URL, nil)
+	a := api.New(g.logger, client, instance.State(), customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+
+	// fetch projects
+	projects, err := a.FetchProjects()
+	if err != nil {
+		return fmt.Errorf("error fetching projects. err: %v", err)
+	}
+	webhookManager := g.manager.WebHookManager()
+
+	for _, proj := range projects {
+		if _, err := g.removeWebHook(webhookManager, a, state, customerID, integrationID, proj.RefID); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func (g *AzureIntegration) removeWebHook(webhookManager sdk.WebHookManager, a *api.API, state sdk.State, customerID, integrationID, projid string) (bool, error) {
+	var ids []string
+	if ok, err := state.Get("webhooks_"+projid, &ids); ok {
+		if err := a.DeleteWebhooks(ids); err != nil {
+			sdk.LogError(g.logger, "error removing webhook", "err", err)
+			webhookManager.Errored(customerID, integrationID, g.refType, projid, sdk.WebHookScopeProject, err)
+			return false, nil
+		}
+	} else if err != nil {
+		return false, err
+	}
+	if err := state.Delete("webhooks_" + projid); err != nil {
+		return false, err
+	}
+	if err := webhookManager.Delete(customerID, integrationID, g.refType, projid, sdk.WebHookScopeProject); err != nil {
+		return false, err
+	}
+	return true, nil
 }
