@@ -2,9 +2,9 @@ package api
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/pinpt/agent.next/sdk"
 )
@@ -21,7 +21,7 @@ var eventTypes = []string{
 }
 
 // RemoveAllWebHooks gets the repos from a project
-func (a *API) RemoveAllWebHooks(concurr int64) error {
+func (a *API) RemoveAllWebHooks() error {
 	endpoint := "/_apis/hooks/subscriptions"
 
 	params := url.Values{}
@@ -38,12 +38,12 @@ func (a *API) RemoveAllWebHooks(concurr int64) error {
 				errochan <- err
 				return
 			}
-			async := sdk.NewAsync(int(concurr))
+			async := sdk.NewAsync(int(a.concurrency))
 			for _, res := range value {
 				if strings.Contains(res.ConsumerInputs.URL, "pinpoint.com/hook") {
 					id := res.ID
 					async.Do(func() error {
-						return a.DeleteWebhook(id)
+						return a.DeleteWebhooks([]string{id})
 					})
 				}
 			}
@@ -64,11 +64,12 @@ func (a *API) RemoveAllWebHooks(concurr int64) error {
 	return <-errochan
 }
 
-// CreateWebhook gets the repos from a project
-func (a *API) CreateWebhook(url, projid string, concurr int64) error {
+// CreateWebhook creates webhook
+func (a *API) CreateWebhook(url, projid string) (ids []string, _ error) {
 
 	sdk.LogInfo(a.logger, "creating webhooks for project", "project", projid)
-	async := sdk.NewAsync(int(concurr))
+	mu := sync.Mutex{}
+	async := sdk.NewAsync(int(a.concurrency))
 	for _, _evt := range eventTypes {
 		evt := _evt
 		async.Do(func() error {
@@ -81,31 +82,34 @@ func (a *API) CreateWebhook(url, projid string, concurr int64) error {
 			payload.PublisherInputs.ProjectID = projid
 			payload.ResourceVersion = "1.0"
 			payload.Scope = 1
-
 			endpoint := "/_apis/hooks/subscriptions"
-			var out interface{}
-			_, err := a.post(endpoint, payload, nil, &out)
-			if err != nil {
-				rerr := err.(*sdk.HTTPError)
-				b, _ := ioutil.ReadAll(rerr.Body)
-				fmt.Println("error", string(b), rerr.StatusCode)
+			var out struct {
+				ID string `json:"id"`
+			}
+			if _, err := a.post(endpoint, payload, nil, &out); err != nil {
 				return err
 			}
-			fmt.Println(sdk.Stringify(out))
+			mu.Lock()
+			ids = append(ids, out.ID)
+			mu.Unlock()
 			return nil
 		})
 	}
 	err := async.Wait()
-	return err
+	return ids, err
 }
 
-// DeleteWebhook removes a webhook
-func (a *API) DeleteWebhook(webhookID string) error {
-	endpoint := fmt.Sprintf("_apis/hooks/subscriptions/%s", url.PathEscape(webhookID))
-	var out interface{}
-	_, err := a.delete(endpoint, nil, &out)
-	if err == nil {
-		fmt.Println("webhook deleted")
+// DeleteWebhooks removes a webhook
+func (a *API) DeleteWebhooks(webhookIDs []string) error {
+	async := sdk.NewAsync(a.concurrency)
+	for _, _id := range webhookIDs {
+		id := _id
+		async.Do(func() error {
+			endpoint := fmt.Sprintf("_apis/hooks/subscriptions/%s", url.PathEscape(id))
+			var out interface{}
+			_, err := a.delete(endpoint, nil, &out)
+			return err
+		})
 	}
-	return err
+	return async.Wait()
 }

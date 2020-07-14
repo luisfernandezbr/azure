@@ -3,6 +3,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/pinpt/agent.next.azure/internal/api"
@@ -33,7 +34,6 @@ func (g *AzureIntegration) Start(logger sdk.Logger, config sdk.Config, manager s
 
 // Enroll is called when a new integration instance is added
 func (g *AzureIntegration) Enroll(instance sdk.Instance) error {
-
 	config := instance.Config()
 	if config.APIKeyAuth == nil {
 		return errors.New("Missing --apikey_auth")
@@ -42,13 +42,20 @@ func (g *AzureIntegration) Enroll(instance sdk.Instance) error {
 	if !ok {
 		concurr = 10
 	}
-	return g.registerWebhook(instance, concurr)
+	return g.registerWebHooks(instance, concurr)
 }
 
 // Dismiss is called when an existing integration instance is removed
 func (g *AzureIntegration) Dismiss(instance sdk.Instance) error {
-	sdk.LogInfo(g.logger, "dismiss not implemented")
-	return nil
+	config := instance.Config()
+	if config.APIKeyAuth == nil {
+		return errors.New("Missing --apikey_auth")
+	}
+	ok, concurr := config.GetInt("concurrency")
+	if !ok {
+		concurr = 10
+	}
+	return g.unregisterWebHooks(instance, concurr)
 }
 
 // Stop is called when the integration is shutting down for cleanup
@@ -60,24 +67,19 @@ func (g *AzureIntegration) Stop() error {
 // Export is called to tell the integration to run an export
 func (g *AzureIntegration) Export(export sdk.Export) error {
 	sdk.LogInfo(g.logger, "export started")
-
-	// Pipe must be called to begin an export and receive a pipe for sending data
 	pipe := export.Pipe()
-
-	// State is a customer specific state object for this integration and customer
 	state := export.State()
-
-	// CustomerID will return the customer id for the export
 	customerID := export.CustomerID()
+	integrationID := export.IntegrationInstanceID()
 
 	sdk.LogDebug(g.logger, "export starting")
-	// Config is any customer specific configuration for this customer
-	config := export.Config()
-	// instance := sdk.NewInstance(config, state, pipe, customerID, export.IntegrationInstanceID())
-	// if err := g.Enroll(*instance); err != nil {
-	// 	return err
-	// }
 
+	config := export.Config()
+	instance := sdk.NewInstance(config, state, pipe, customerID, export.IntegrationInstanceID())
+	if err := g.Enroll(*instance); err != nil {
+		return err
+	}
+	os.Exit(1)
 	auth := config.APIKeyAuth
 	if auth == nil {
 		return errors.New("Missing --apikey_auth")
@@ -133,7 +135,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 
 	workUsermap := map[string]*sdk.WorkUser{}
 	sourcecodeUsermap := map[string]*sdk.SourceCodeUser{}
-	a := api.New(g.logger, client, state, customerID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+	a := api.New(g.logger, client, state, customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
 	projects, err := a.FetchProjects()
 	if err != nil {
 		return fmt.Errorf("error fetching projects. err: %v", err)
