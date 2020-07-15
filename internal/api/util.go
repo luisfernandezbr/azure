@@ -6,6 +6,15 @@ import (
 	"github.com/pinpt/agent.next/sdk"
 )
 
+func stringEquals(str string, vals ...string) bool {
+	for _, v := range vals {
+		if str == v {
+			return true
+		}
+	}
+	return false
+}
+
 type issueProjectRefs struct {
 	IssueID   int    `json:"issue_id"`
 	ProjectID string `json:"project_id"`

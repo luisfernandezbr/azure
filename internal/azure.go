@@ -3,7 +3,6 @@ package internal
 import (
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/pinpt/agent.next.azure/internal/api"
@@ -75,11 +74,11 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	sdk.LogDebug(g.logger, "export starting")
 
 	config := export.Config()
-	instance := sdk.NewInstance(config, state, pipe, customerID, export.IntegrationInstanceID())
-	if err := g.Enroll(*instance); err != nil {
-		return err
-	}
-	os.Exit(1)
+	// instance := sdk.NewInstance(config, state, pipe, customerID, export.IntegrationInstanceID())
+	// if err := g.Enroll(*instance); err != nil {
+	// 	return err
+	// }
+	// os.Exit(1)
 	auth := config.APIKeyAuth
 	if auth == nil {
 		return errors.New("Missing --apikey_auth")
@@ -114,6 +113,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 			pipe.Write(each)
 		}
 	}()
+
 	issueChannel := make(chan *sdk.WorkIssue, concurr)
 	go func() {
 		for each := range issueChannel {
@@ -142,6 +142,8 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	}
 
 	for _, proj := range projects {
+
+		g.sendCapabilities(pipe, customerID, integrationID, proj.RefID)
 		pipe.Write(proj)
 
 		var updated time.Time
@@ -197,4 +199,26 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 		sdk.LogInfo(g.logger, "export finished")
 	}
 	return err
+}
+
+func (g *AzureIntegration) sendCapabilities(pipe sdk.Pipe, customerID, integrationID, projid string) {
+	pipe.Write(&sdk.WorkProjectCapability{
+		Attachments:           false,
+		ChangeLogs:            true,
+		CustomerID:            customerID,
+		DueDates:              true,
+		Epics:                 false,
+		InProgressStates:      true,
+		IntegrationInstanceID: &integrationID,
+		KanbanBoards:          false,
+		LinkedIssues:          false,
+		Parents:               false,
+		Priorities:            true,
+		ProjectID:             sdk.NewWorkProjectID(customerID, projid, g.refType),
+		RefID:                 projid,
+		RefType:               g.refType,
+		Resolutions:           true,
+		Sprints:               true,
+		StoryPoints:           true,
+	})
 }
