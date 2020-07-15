@@ -92,15 +92,7 @@ func (a *API) FetchStatuses(issueStatusChannel chan<- *sdk.WorkIssueStatus) erro
 			return async2.Wait()
 		})
 	}
-	err := async.Wait()
-	for k1, v1 := range statusesMap {
-		for k2, v2 := range v1 {
-			for k3, v3 := range v2 {
-				fmt.Println(k1, k2, k3, v3)
-			}
-		}
-	}
-	return err
+	return async.Wait()
 }
 
 // FetchAllIssues gets issues from project id
@@ -147,6 +139,7 @@ func (a *API) FetchIssues(projid string, ids []string, issueChannel chan<- *sdk.
 	processid := projectProcessMap[projid]
 	process := statusesMap[processid]
 
+	// flush the data once in a while
 	if err := a.state.Flush(); err != nil {
 		return err
 	}
