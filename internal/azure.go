@@ -133,9 +133,21 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 		}
 	}()
 
+	statusesChannel := make(chan *sdk.WorkIssueStatus, concurr)
+	go func() {
+		for each := range statusesChannel {
+			pipe.Write(each)
+		}
+	}()
+
 	workUsermap := map[string]*sdk.WorkUser{}
 	sourcecodeUsermap := map[string]*sdk.SourceCodeUser{}
 	a := api.New(g.logger, client, state, customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+
+	if err := a.FetchStatuses(statusesChannel); err != nil {
+		return err
+	}
+
 	projects, err := a.FetchProjects()
 	if err != nil {
 		return fmt.Errorf("error fetching projects. err: %v", err)

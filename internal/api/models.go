@@ -377,3 +377,67 @@ type issueCommentReponse struct {
 	Version      int       `json:"version"`
 	WorkItemID   int       `json:"workItemId"`
 }
+
+type processesResponse struct {
+	CustomizationType   string `json:"customizationType"`
+	Description         string `json:"description"`
+	IsDefault           bool   `json:"isDefault"`
+	IsEnabled           bool   `json:"isEnabled"`
+	Name                string `json:"name"`
+	ParentProcessTypeID string `json:"parentProcessTypeId"`
+	ReferenceName       string `json:"referenceName"`
+	TypeID              string `json:"typeId"`
+}
+
+type itemTypeResponse struct {
+	CustomizationType   string `json:"customizationType"`
+	Description         string `json:"description"`
+	IsDefault           bool   `json:"isDefault"`
+	IsEnabled           bool   `json:"isEnabled"`
+	Name                string `json:"name"`
+	ParentProcessTypeID string `json:"parentProcessTypeId"`
+	ReferenceName       string `json:"referenceName"`
+	TypeID              string `json:"typeId"`
+}
+
+type stateResponse struct {
+	Color             string `json:"color"`
+	CustomizationType string `json:"customizationType"`
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	Order             int    `json:"order"`
+	StateCategory     string `json:"stateCategory"`
+	URL               string `json:"url"`
+}
+
+type projectDetailResponse struct {
+	Capabilities struct {
+		ProcessTemplate struct {
+			TemplateName   string `json:"templateName"`
+			TemplateTypeID string `json:"templateTypeId"`
+		} `json:"processTemplate"`
+		Versioncontrol struct {
+			GitEnabled        string `json:"gitEnabled"`
+			SourceControlType string `json:"sourceControlType"`
+			TfvcEnabled       string `json:"tfvcEnabled"`
+		} `json:"versioncontrol"`
+	} `json:"capabilities"`
+	Collection struct {
+		CollectionURL string `json:"collectionUrl"`
+		ID            string `json:"id"`
+		Name          string `json:"name"`
+		URL           string `json:"url"`
+	} `json:"collection"`
+	DefaultTeam struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		URL  string `json:"url"`
+	} `json:"defaultTeam"`
+	ID             string `json:"id"`
+	LastUpdateTime string `json:"lastUpdateTime"`
+	Name           string `json:"name"`
+	Revision       int    `json:"revision"`
+	State          string `json:"state"`
+	URL            string `json:"url"`
+	Visibility     string `json:"visibility"`
+}

@@ -12,6 +12,89 @@ import (
 
 const whereDateFormat = `01/02/2006 15:04:05Z`
 
+// process_id - type_name - state_name
+var statusesMap = map[string]map[string]map[string]string{}
+
+// FetchStatuses gets issues from project id
+func (a *API) FetchStatuses(issueStatusChannel chan<- *sdk.WorkIssueStatus) error {
+
+	mu := sync.Mutex{}
+
+	params := url.Values{}
+	params.Set("api-version", "5.1-preview.2")
+	var out struct {
+		Value []processesResponse `json:"value"`
+	}
+	if _, err := a.get("_apis/work/processes", params, &out); err != nil {
+		return err
+	}
+
+	async := sdk.NewAsync(a.concurrency / 2)
+	for _, _val := range out.Value {
+		val := _val
+
+		mu.Lock()
+		if statusesMap[val.TypeID] == nil {
+			statusesMap[val.TypeID] = map[string]map[string]string{}
+		}
+		mu.Unlock()
+
+		async.Do(func() error {
+
+			params := url.Values{}
+			params.Set("api-version", "5.1-preview.2")
+			var out struct {
+				Value []itemTypeResponse `json:"value"`
+			}
+			if _, err := a.get("_apis/work/processes/"+val.TypeID+"/workItemTypes", params, &out); err != nil {
+				return err
+			}
+
+			async2 := sdk.NewAsync(a.concurrency / 2)
+			for _, _v := range out.Value {
+				v := _v
+
+				mu.Lock()
+				if statusesMap[val.TypeID][v.Name] == nil {
+					statusesMap[val.TypeID][v.Name] = map[string]string{}
+				}
+				mu.Unlock()
+
+				async2.Do(func() error {
+
+					params := url.Values{}
+					params.Set("api-version", "5.1-preview.1")
+					var out struct {
+						Value []stateResponse `json:"value"`
+					}
+					if _, err := a.get("_apis/work/processes/"+val.TypeID+"/workItemTypes/"+v.ReferenceName+"/states", params, &out); err != nil {
+						return err
+					}
+
+					for _, state := range out.Value {
+						issueStatusChannel <- &sdk.WorkIssueStatus{
+							CustomerID:            a.customerID,
+							Description:           state.StateCategory,
+							IntegrationInstanceID: &a.integrationID,
+							Name:                  state.Name,
+							RefID:                 state.ID,
+							RefType:               a.refType,
+						}
+
+						mu.Lock()
+						statusesMap[val.TypeID][v.Name][state.Name] = state.ID
+						mu.Unlock()
+
+					}
+					return nil
+				})
+			}
+			return async2.Wait()
+		})
+	}
+	return async.Wait()
+}
+
 // FetchAllIssues gets issues from project id
 func (a *API) FetchAllIssues(projid string, updated time.Time, issueChannel chan<- *sdk.WorkIssue, issueCommentChannel chan<- *sdk.WorkIssueComment) error {
 
@@ -52,6 +135,9 @@ func (a *API) FetchAllIssues(projid string, updated time.Time, issueChannel chan
 
 // FetchIssues gets all the issues from the ids array
 func (a *API) FetchIssues(projid string, ids []string, issueChannel chan<- *sdk.WorkIssue, issueCommentChannel chan<- *sdk.WorkIssueComment) error {
+
+	processid := projectProcessMap[projid]
+	process := statusesMap[processid]
 
 	// flush the data once in a while
 	if err := a.state.Flush(); err != nil {
@@ -115,8 +201,9 @@ func (a *API) FetchIssues(projid string, ids []string, issueChannel chan<- *sdk.
 				RefID:         a.createIssueID(projid, item.ID),
 				RefType:       a.refType,
 				ReporterRefID: fields.CreatedBy.ID,
-				Resolution:    fields.ResolvedReason, //itemStateName(fields.ResolvedReason, item.Fields.WorkItemType),
-				Status:        fields.State,          // itemStateName(fields.State, item.Fields.WorkItemType),
+				Resolution:    fields.ResolvedReason,
+				Status:        fields.State,
+				StatusID:      sdk.NewWorkIssueStatusID(a.customerID, a.refType, process[fields.WorkItemType][fields.State]),
 				StoryPoints:   &storypoints,
 				Tags:          strings.Split(fields.Tags, "; "),
 				Title:         fields.Title,
