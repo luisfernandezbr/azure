@@ -48,15 +48,6 @@ async function fetchRepos(projid: string, auth: IAuth): Promise<[number, repo[]]
 	console.error('error fetching projects, status code', res[1]);
 	return [res[1], []];
 }
-function getAuth(conf: Config): IAuth | null {
-	if (conf.apikey_auth) {
-		return conf.apikey_auth as IAPIKeyAuth;
-	}
-	if (conf.oauth2_auth) {
-		return conf.oauth2_auth as IOAuth2Auth;
-	}
-	return null;
-}
 function createAuthHeader(auth: IAuth): string {
 	if ('apikey' in auth) {
 		let a = (auth as IAPIKeyAuth);
@@ -72,17 +63,22 @@ const AccountList = ({ projects, setProjects }: { projects: project[], setProjec
 	const [fetching, setFetching] = useState(false);
 	const [accounts, setAccounts] = useState<Account[]>([]);
 
+	let auth: IAuth
+	if (config.apikey_auth) {
+		auth = config.apikey_auth as IAPIKeyAuth;
+	} else {
+		auth = config.oauth2_auth as IOAuth2Auth;
+	}
+
 	useEffect(() => {
-		if (fetching || accounts.length) {
+		if (fetching || accounts.length || !projects.length) {
 			return;
 		}
 		setFetching(true);
 		const fetch = async () => {
-			let accts: Account[] = [];
 			config.accounts = {};
 			for (var i = 0; i < projects.length; i++) {
 				let proj = projects[i];
-				let auth = getAuth(config);
 				let res = await fetchRepos(proj.id, auth!);
 				if (res[0] === 200) {
 					let acc: Account = {
@@ -94,30 +90,30 @@ const AccountList = ({ projects, setProjects }: { projects: project[], setProjec
 						type: 'ORG',
 						public: proj.visibility === 'public',
 					};
-					accts.push(acc);
+					accounts.push(acc);
 					config.accounts[proj.id] = acc;
 				}
 			}
 			setConfig(config);
-			setAccounts(accts);
+			setAccounts(accounts);
 			setFetching(false);
 		}
 		fetch();
 	}, [projects]);
 
 	useEffect(() => {
-		if (projects.length === 0) {
-			let auth = getAuth(config);
-			const fetch = async () => {
-				var res = await fetchProjects(auth!);
-				if (res[0] === 200) {
-					setProjects(res[1]);
-				} else {
-					console.error('error fetching projects. responde code', res[0]);
-				}
-			}
-			fetch();
+		if (projects.length) {
+			return
 		}
+		const fetch = async () => {
+			var res = await fetchProjects(auth!);
+			if (res[0] === 200) {
+				setProjects(res[1]);
+			} else {
+				console.error('error fetching projects. responde code', res[0]);
+			}
+		}
+		fetch();
 	}, [config.apikey_auth, config.oauth2_auth]);
 
 	return (
