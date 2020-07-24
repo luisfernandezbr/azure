@@ -335,6 +335,8 @@ github.com/pinpt/go-common/v10 v10.0.14 h1:thkW72f3VnN1jiEW6TVFZ0TgD9VkD+9jZSQR/
 github.com/pinpt/go-common/v10 v10.0.14/go.mod h1:uRe9KzBE26kjqD+2UgreBQqesesXyBUEIjBT2NEK3kk=
 github.com/pinpt/go-common/v10 v10.0.15 h1:pqmkOSbJ9YyLB2wWpDd4LHvBnD07dFTkFpgbA8yusGE=
 github.com/pinpt/go-common/v10 v10.0.15/go.mod h1:uRe9KzBE26kjqD+2UgreBQqesesXyBUEIjBT2NEK3kk=
+github.com/pinpt/go-common/v10 v10.0.16 h1:UtVt5Lr3R8ygZwr/18yY1O5uq0/Dd+J5OULFz+voKuo=
+github.com/pinpt/go-common/v10 v10.0.16/go.mod h1:uRe9KzBE26kjqD+2UgreBQqesesXyBUEIjBT2NEK3kk=
 github.com/pinpt/go-datamodel v0.0.1060/go.mod h1:6bZ1Xv1BjlanhlbDw1u7YE/B2kyh51fpYb/5bYtF30k=
 github.com/pinpt/httpclient v0.0.0-20190815022759-09e0028c9067 h1:GG0k6rjX7ywCwYnjVudy3OXXivcMAih8s08+sDrQiEE=
 github.com/pinpt/httpclient v0.0.0-20190815022759-09e0028c9067/go.mod h1:SzzGa0kOT+frqT6ABgV69U9+jlMU98XkmKup+HEZRVI=
@@ -346,6 +348,8 @@ github.com/pinpt/integration-sdk v0.0.1065 h1:79OmXbmnPKMtuFhoaDCtvQj5jJC21/AK7P
 github.com/pinpt/integration-sdk v0.0.1065/go.mod h1:GvEOhGTIbb2cYGBL/dvtxd/2/ocMPKewWDLaAhr9m1M=
 github.com/pinpt/integration-sdk v0.0.1077 h1:1d9qNp9XVxcEOiVLhQ3ay+xY6f602dFIMJEB5S9uVW4=
 github.com/pinpt/integration-sdk v0.0.1077/go.mod h1:bM5Eff/xhdpT39fVKuylBJt69fPpGVk85Tl+cOs2yqg=
+github.com/pinpt/integration-sdk v0.0.1092 h1:nWCa51gCU08Ruxc5wADgG1TyGLrR7hagOSgocmV5D1A=
+github.com/pinpt/integration-sdk v0.0.1092/go.mod h1:bM5Eff/xhdpT39fVKuylBJt69fPpGVk85Tl+cOs2yqg=
 github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4 h1:49lOXmGaUpV9Fz3gd7TFZY106KVlPVa5jcYD1gaQf98=
 github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4/go.mod h1:4OwLy04Bl9Ef3GJJCoec+30X3LQs/0/m4HFRt/2LUSA=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
