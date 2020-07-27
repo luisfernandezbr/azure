@@ -59,7 +59,7 @@ function createAuthHeader(auth: IAuth): string {
 
 const AccountList = ({ projects, setProjects }: { projects: project[], setProjects: (val: project[]) => void }) => {
 
-	const { config, setConfig } = useIntegration();
+	const { config, setConfig, installed, setInstallEnabled } = useIntegration();
 	const [fetching, setFetching] = useState(false);
 	const [accounts, setAccounts] = useState<Account[]>([]);
 
@@ -100,6 +100,10 @@ const AccountList = ({ projects, setProjects }: { projects: project[], setProjec
 		}
 		fetch();
 	}, [projects]);
+
+	useEffect(() => {
+		setInstallEnabled(installed || accounts.length > 0);
+	}, [accounts])
 
 	useEffect(() => {
 		if (projects.length) {
