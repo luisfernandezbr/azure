@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Icon, Loader, Error } from '@pinpt/uic.next';
+import { Icon, Loader } from '@pinpt/uic.next';
 import {
 	useIntegration,
 	Account,
@@ -30,23 +30,29 @@ interface repo {
 	name: string;
 }
 
-async function fetchProjects(auth: IAuth): Promise<[number, project[]]> {
-	let url = auth.url + '/_apis/projects?api-version=5.1';
-	let res = await Http.get(url, { 'Authorization': createAuthHeader(auth) });
-	if (res[1] === 200) {
-		return [res[1], res[0].value];
+async function fetchProjects(auth: IAuth): Promise<project[]> {
+	try {
+		let url = auth.url + '/_apis/projects?api-version=5.1';
+		let res = await Http.get(url, { 'Authorization': createAuthHeader(auth) });
+		if (res[1] === 200) {
+			return res[0].value;
+		}
+		throw new Error('error fetching projects, status code' + res[1]);
+	} catch (err) {
+		throw new Error('error fetching projects, check url and api key');
 	}
-	console.error('error fetching projects, status code', res[1]);
-	return [res[1], []];
 }
-async function fetchRepos(projid: string, auth: IAuth): Promise<[number, repo[]]> {
-	let url = auth.url + '/' + projid + '/_apis/git/repositories?api-version=5.1';
-	let res = await Http.get(url, { 'Authorization': createAuthHeader(auth) });
-	if (res[1] === 200) {
-		return [res[1], res[0].value];
+async function fetchRepos(projid: string, auth: IAuth): Promise<repo[]> {
+	try {
+		let url = auth.url + '/' + projid + '/_apis/git/repositories?api-version=5.1';
+		let res = await Http.get(url, { 'Authorization': createAuthHeader(auth) });
+		if (res[1] === 200) {
+			return res[0].value;
+		}
+		throw new Error('error fetching repos, status code' + res[1]);
+	} catch (err) {
+		throw new Error('error fetching repos ' + err.message);
 	}
-	console.error('error fetching projects, status code', res[1]);
-	return [res[1], []];
 }
 function createAuthHeader(auth: IAuth): string {
 	if ('apikey' in auth) {
@@ -79,42 +85,45 @@ const AccountList = ({ projects, setProjects }: { projects: project[], setProjec
 			config.accounts = {};
 			for (var i = 0; i < projects.length; i++) {
 				let proj = projects[i];
-				let res = await fetchRepos(proj.id, auth!);
-				if (res[0] === 200) {
-					let acc: Account = {
-						id: proj.id,
-						name: proj.name,
-						description: proj.description,
-						avatarUrl: '',
-						totalCount: res[1].length,
-						type: 'ORG',
-						public: proj.visibility === 'public',
-					};
-					accounts.push(acc);
-					config.accounts[proj.id] = acc;
+				let res: repo[];
+				try {
+					res = await fetchRepos(proj.id, auth!);
+				} catch (err) {
+					console.error(err);
+					return;
 				}
+				let acc: Account = {
+					id: proj.id,
+					name: proj.name,
+					description: proj.description,
+					avatarUrl: '',
+					totalCount: res.length,
+					type: 'ORG',
+					public: proj.visibility === 'public',
+				};
+				accounts.push(acc);
+				config.accounts[proj.id] = acc;
 			}
 			setConfig(config);
 			setAccounts(accounts);
+			if (!installed && accounts.length > 0) {
+				setInstallEnabled(true);
+			}
 			setFetching(false);
 		}
 		fetch();
 	}, [projects]);
 
 	useEffect(() => {
-		setInstallEnabled(installed || accounts.length > 0);
-	}, [accounts])
-
-	useEffect(() => {
 		if (projects.length) {
 			return
 		}
 		const fetch = async () => {
-			var res = await fetchProjects(auth!);
-			if (res[0] === 200) {
-				setProjects(res[1]);
-			} else {
-				console.error('error fetching projects. responde code', res[0]);
+			try {
+				var res = await fetchProjects(auth!);
+				setProjects(res);
+			} catch (err) {
+				console.error('error fetching projects. responde code', err);
 			}
 		}
 		fetch();
@@ -147,10 +156,13 @@ const LocationSelector = ({ setType }: { setType: (val: IntegrationType) => void
 };
 
 const SelfManagedForm = ({ setProjects }: { setProjects: (val: project[]) => void }) => {
-	async function verify(auth: IAuth): Promise<boolean> {
-		var res = await fetchProjects(auth!);
-		setProjects(res[1]);
-		return res[0] === 200;
+	async function verify(auth: IAuth) {
+		try {
+			var res = await fetchProjects(auth!);
+			setProjects(res);
+		} catch (err) {
+			throw new Error(err.message)
+		}
 	}
 	return <Form type={FormType.API} name='AzureDevOps' callback={verify} />;
 };
