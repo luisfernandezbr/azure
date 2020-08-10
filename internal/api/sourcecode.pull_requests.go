@@ -145,7 +145,7 @@ func (a *API) sendPullRequest(projid string, reponame string, repoRefID string, 
 		Title:                 p.Title,
 		URL:                   p.URL,
 		CommitShas:            p.commitSHAs,
-		Identifier:            reponame,
+		Identifier:            fmt.Sprintf("%s#%d", reponame, p.PullRequestID),
 	}
 	if p.commitSHAs != nil {
 		pr.BranchID = sdk.NewSourceCodeBranchID(a.customerID, repoRefID, a.refType, p.SourceBranch, p.commitSHAs[0])
