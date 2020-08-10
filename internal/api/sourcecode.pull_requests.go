@@ -12,7 +12,7 @@ import (
 // FetchPullRequests calls the pull request api and processes the reponse sending each object to the corresponding channel async
 // sdk.SourceCodePullRequest, sdk.SourceCodePullRequestReview, sdk.SourceCodePullRequestComment, and sdk.SourceCodePullRequestCommit
 func (a *API) FetchPullRequests(
-	projid string, repoid string, updated time.Time,
+	projid string, repoid string, reponame string, updated time.Time,
 	prsChannel chan<- *sdk.SourceCodePullRequest,
 	prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit,
 	prCommentsChannel chan<- *sdk.SourceCodePullRequestComment,
@@ -34,7 +34,7 @@ func (a *API) FetchPullRequests(
 			if err := object.Unmarshal(&value); err != nil {
 				errochan <- err
 			}
-			err := a.processPullRequests(value, projid, repoid, updated, prsChannel, prCommitsChannel, prCommentsChannel, prReviewsChannel)
+			err := a.processPullRequests(value, projid, repoid, reponame, updated, prsChannel, prCommitsChannel, prCommentsChannel, prReviewsChannel)
 			if err != nil {
 				errochan <- err
 				return
@@ -75,7 +75,7 @@ func (a *API) UpdatePullRequest(refid string, v *sdk.SourcecodePullRequestUpdate
 }
 
 func (a *API) processPullRequests(value []pullRequestResponse,
-	projid string, repoid string, updated time.Time,
+	projid string, repoid string, reponame string, updated time.Time,
 	prsChannel chan<- *sdk.SourceCodePullRequest,
 	prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit,
 	prCommentsChannel chan<- *sdk.SourceCodePullRequestComment,
@@ -110,7 +110,7 @@ func (a *API) processPullRequests(value []pullRequestResponse,
 		async.Do(func() error {
 			pr.SourceBranch = strings.TrimPrefix(p.SourceBranch, "refs/heads/")
 			pr.TargetBranch = strings.TrimPrefix(p.TargetBranch, "refs/heads/")
-			if err := a.sendPullRequestCommits(projid, pr, prsChannel, prCommitsChannel); err != nil {
+			if err := a.sendPullRequestCommits(projid, reponame, pr, prsChannel, prCommitsChannel); err != nil {
 				return fmt.Errorf("error fetching commits for PR, skipping pr_id:%v repo_id:%v err:%v", pr.PullRequestID, pr.Repository.ID, err)
 			}
 			return nil
@@ -131,21 +131,21 @@ func (a *API) processPullRequests(value []pullRequestResponse,
 	return async.Wait()
 }
 
-func (a *API) sendPullRequest(projid string, repoRefID string, p pullRequestResponseWithShas, prsChannel chan<- *sdk.SourceCodePullRequest) {
-
+func (a *API) sendPullRequest(projid string, reponame string, repoRefID string, p pullRequestResponseWithShas, prsChannel chan<- *sdk.SourceCodePullRequest) {
 	prrefid := a.createPullRequestID(projid, repoRefID, p.PullRequestID)
 	pr := &sdk.SourceCodePullRequest{
-		BranchName:     p.SourceBranch,
-		CreatedByRefID: p.CreatedBy.ID,
-		CustomerID:     a.customerID,
-		Description:    `<div class="source-azure">` + p.Description + "</div>",
-		RefID:          prrefid,
-		RefType:        a.refType,
-		RepoID:         sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
-		Title:          p.Title,
-		URL:            p.URL,
-		CommitShas:     p.commitSHAs,
-		Identifier:     fmt.Sprintf("#%d", p.PullRequestID), // format for displaying the PR in app
+		BranchName:            p.SourceBranch,
+		CreatedByRefID:        p.CreatedBy.ID,
+		CustomerID:            a.customerID,
+		Description:           `<div class="source-azure">` + p.Description + "</div>",
+		IntegrationInstanceID: &a.integrationID,
+		RefID:                 prrefid,
+		RefType:               a.refType,
+		RepoID:                sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
+		Title:                 p.Title,
+		URL:                   p.URL,
+		CommitShas:            p.commitSHAs,
+		Identifier:            reponame,
 	}
 	if p.commitSHAs != nil {
 		pr.BranchID = sdk.NewSourceCodeBranchID(a.customerID, repoRefID, a.refType, p.SourceBranch, p.commitSHAs[0])

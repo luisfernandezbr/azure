@@ -31,13 +31,14 @@ func (a *API) FetchRepos(projid string) ([]*sdk.SourceCodeRepo, error) {
 			reponame = repo.Project.Name + "/" + repo.Name
 		}
 		allRepos = append(allRepos, &sdk.SourceCodeRepo{
-			Active:        true,
-			CustomerID:    a.customerID,
-			DefaultBranch: strings.TrimPrefix(repo.DefaultBranch, "refs/heads/"),
-			Name:          reponame,
-			RefID:         repo.ID,
-			RefType:       a.refType,
-			URL:           repo.RemoteURL,
+			Active:                true,
+			CustomerID:            a.customerID,
+			DefaultBranch:         strings.TrimPrefix(repo.DefaultBranch, "refs/heads/"),
+			IntegrationInstanceID: &a.integrationID,
+			Name:                  reponame,
+			RefID:                 repo.ID,
+			RefType:               a.refType,
+			URL:                   repo.RemoteURL,
 		})
 	}
 

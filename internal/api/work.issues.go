@@ -12,11 +12,8 @@ import (
 
 const whereDateFormat = `01/02/2006 15:04:05Z`
 
-// process_id - type_name - state_name
-var statusesMap = map[string]map[string]map[string]string{}
-
 // FetchStatuses gets issues from project id
-func (a *API) FetchStatuses(issueStatusChannel chan<- *sdk.WorkIssueStatus) error {
+func (a *API) FetchStatuses(issueStatusChannel chan<- *sdk.WorkIssueStatus) (*sdk.WorkConfig, error) {
 
 	mu := sync.Mutex{}
 
@@ -26,16 +23,16 @@ func (a *API) FetchStatuses(issueStatusChannel chan<- *sdk.WorkIssueStatus) erro
 		Value []processesResponse `json:"value"`
 	}
 	if _, err := a.get("_apis/work/processes", params, &out); err != nil {
-		return err
+		return nil, err
 	}
-
+	statuses := sdk.WorkConfigStatuses{}
 	async := sdk.NewAsync(a.concurrency / 2)
 	for _, _val := range out.Value {
 		val := _val
 
 		mu.Lock()
-		if statusesMap[val.TypeID] == nil {
-			statusesMap[val.TypeID] = map[string]map[string]string{}
+		if a.statusesMap[val.TypeID] == nil {
+			a.statusesMap[val.TypeID] = map[string]map[string]string{}
 		}
 		mu.Unlock()
 
@@ -55,8 +52,8 @@ func (a *API) FetchStatuses(issueStatusChannel chan<- *sdk.WorkIssueStatus) erro
 				v := _v
 
 				mu.Lock()
-				if statusesMap[val.TypeID][v.Name] == nil {
-					statusesMap[val.TypeID][v.Name] = map[string]string{}
+				if a.statusesMap[val.TypeID][v.Name] == nil {
+					a.statusesMap[val.TypeID][v.Name] = map[string]string{}
 				}
 				mu.Unlock()
 
@@ -82,7 +79,17 @@ func (a *API) FetchStatuses(issueStatusChannel chan<- *sdk.WorkIssueStatus) erro
 						}
 
 						mu.Lock()
-						statusesMap[val.TypeID][v.Name][state.Name] = state.ID
+						a.statusesMap[val.TypeID][v.Name][state.Name] = state.ID
+
+						switch state.StateCategory {
+						case "InProgress":
+							statuses.InProgressStatus = appendUnique(statuses.InProgressStatus, state.Name)
+						case "Proposed":
+							statuses.OpenStatus = appendUnique(statuses.OpenStatus, state.Name)
+						case "Completed", "Removed", "Resolved":
+							statuses.ClosedStatus = appendUnique(statuses.ClosedStatus, state.Name)
+						}
+
 						mu.Unlock()
 
 					}
@@ -92,7 +99,14 @@ func (a *API) FetchStatuses(issueStatusChannel chan<- *sdk.WorkIssueStatus) erro
 			return async2.Wait()
 		})
 	}
-	return async.Wait()
+	err := async.Wait()
+	workconf := &sdk.WorkConfig{
+		CustomerID:            a.customerID,
+		IntegrationInstanceID: a.integrationID,
+		RefType:               a.refType,
+		Statuses:              statuses,
+	}
+	return workconf, err
 }
 
 // FetchAllIssues gets issues from project id
@@ -137,7 +151,7 @@ func (a *API) FetchAllIssues(projid string, updated time.Time, issueChannel chan
 func (a *API) FetchIssues(projid string, ids []string, issueChannel chan<- *sdk.WorkIssue, issueCommentChannel chan<- *sdk.WorkIssueComment) error {
 
 	processid := projectProcessMap[projid]
-	process := statusesMap[processid]
+	process := a.statusesMap[processid]
 
 	// flush the data once in a while
 	if err := a.state.Flush(); err != nil {
@@ -191,27 +205,27 @@ func (a *API) FetchIssues(projid string, ids []string, issueChannel chan<- *sdk.
 
 			storypoints := fields.StoryPoints
 			issue := &sdk.WorkIssue{
-				AssigneeRefID: fields.AssignedTo.ID,
-				CreatorRefID:  fields.CreatedBy.ID,
-				CustomerID:    a.customerID,
-				Description:   fields.Description,
-				Identifier:    fmt.Sprintf("%s-%d", fields.TeamProject, item.ID),
-				Priority:      fmt.Sprint(fields.Priority),
-				ProjectID:     sdk.NewWorkProjectID(a.customerID, projid, a.refType),
-				RefID:         a.createIssueID(projid, item.ID),
-				RefType:       a.refType,
-				ReporterRefID: fields.CreatedBy.ID,
-				Resolution:    fields.ResolvedReason,
-				Status:        fields.State,
-				StatusID:      sdk.NewWorkIssueStatusID(a.customerID, a.refType, process[fields.WorkItemType][fields.State]),
-				StoryPoints:   &storypoints,
-				Tags:          strings.Split(fields.Tags, "; "),
-				Title:         fields.Title,
-				Type:          fields.WorkItemType,
-				URL:           item.Links.HTML.HREF,
-				SprintIds:     []string{sdk.NewAgileSprintID(a.customerID, fields.IterationPath, a.refType)},
+				AssigneeRefID:         fields.AssignedTo.ID,
+				CreatorRefID:          fields.CreatedBy.ID,
+				CustomerID:            a.customerID,
+				Description:           fields.Description,
+				IntegrationInstanceID: &a.integrationID,
+				Identifier:            fmt.Sprintf("%s-%d", fields.TeamProject, item.ID),
+				Priority:              fmt.Sprint(fields.Priority),
+				ProjectID:             sdk.NewWorkProjectID(a.customerID, projid, a.refType),
+				RefID:                 a.createIssueID(projid, item.ID),
+				RefType:               a.refType,
+				ReporterRefID:         fields.CreatedBy.ID,
+				Resolution:            fields.ResolvedReason,
+				Status:                fields.State,
+				StatusID:              sdk.NewWorkIssueStatusID(a.customerID, a.refType, process[fields.WorkItemType][fields.State]),
+				StoryPoints:           &storypoints,
+				Tags:                  strings.Split(fields.Tags, "; "),
+				Title:                 fields.Title,
+				Type:                  fields.WorkItemType,
+				URL:                   item.Links.HTML.HREF,
+				SprintIds:             []string{sdk.NewAgileSprintID(a.customerID, fields.IterationPath, a.refType)},
 			}
-
 			sdk.ConvertTimeToDateModel(fields.CreatedDate, &issue.CreatedDate)
 			sdk.ConvertTimeToDateModel(fields.DueDate, &issue.DueDate)
 

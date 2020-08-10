@@ -28,14 +28,15 @@ func (a *API) FetchProjects() ([]*sdk.WorkProject, error) {
 	var projects []*sdk.WorkProject
 	for _, proj := range out.Value {
 		projects = append(projects, &sdk.WorkProject{
-			Active:      proj.State == "wellFormed",
-			CustomerID:  a.customerID,
-			Description: &proj.Description,
-			Identifier:  proj.Name,
-			Name:        proj.Name,
-			RefID:       proj.ID,
-			RefType:     a.refType,
-			URL:         proj.URL,
+			Active:                proj.State == "wellFormed",
+			CustomerID:            a.customerID,
+			Description:           &proj.Description,
+			IntegrationInstanceID: &a.integrationID,
+			Identifier:            proj.Name,
+			Name:                  proj.Name,
+			RefID:                 proj.ID,
+			RefType:               a.refType,
+			URL:                   proj.URL,
 		})
 		projid := proj.ID
 		async.Do(func() error {

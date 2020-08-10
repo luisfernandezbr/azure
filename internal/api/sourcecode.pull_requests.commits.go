@@ -19,26 +19,27 @@ func (a *API) sendPullRequestCommit(projid string, repoRefID string, p pullReque
 	}
 	prrefid := a.createPullRequestID(projid, repoRefID, p.PullRequestID)
 	commit := &sdk.SourceCodePullRequestCommit{
-		Additions:      out.ChangeCounts.Add,
-		AuthorRefID:    out.Push.PushedBy.ID,
-		BranchID:       sdk.NewSourceCodeBranchID(a.customerID, repoRefID, a.refType, p.SourceBranch, p.commitSHAs[0]),
-		CommitterRefID: out.Push.PushedBy.ID,
-		CustomerID:     a.customerID,
-		Deletions:      out.ChangeCounts.Delete,
-		Message:        out.Comment,
-		PullRequestID:  sdk.NewSourceCodePullRequestID(a.customerID, prrefid, a.refType, repoRefID),
-		RefID:          sha,
-		RefType:        a.refType,
-		RepoID:         sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
-		Sha:            sha,
-		URL:            out.RemoteURL,
+		Additions:             out.ChangeCounts.Add,
+		AuthorRefID:           out.Push.PushedBy.ID,
+		BranchID:              sdk.NewSourceCodeBranchID(a.customerID, repoRefID, a.refType, p.SourceBranch, p.commitSHAs[0]),
+		CommitterRefID:        out.Push.PushedBy.ID,
+		CustomerID:            a.customerID,
+		Deletions:             out.ChangeCounts.Delete,
+		IntegrationInstanceID: &a.integrationID,
+		Message:               out.Comment,
+		PullRequestID:         sdk.NewSourceCodePullRequestID(a.customerID, prrefid, a.refType, repoRefID),
+		RefID:                 sha,
+		RefType:               a.refType,
+		RepoID:                sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
+		Sha:                   sha,
+		URL:                   out.RemoteURL,
 	}
 	sdk.ConvertTimeToDateModel(out.Push.Date, &commit.CreatedDate)
 	prCommitsChannel <- commit
 	return nil
 }
 
-func (a *API) sendPullRequestCommits(projid string, pr pullRequestResponseWithShas, prsChannel chan<- *sdk.SourceCodePullRequest, prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit) error {
+func (a *API) sendPullRequestCommits(projid string, reponame string, pr pullRequestResponseWithShas, prsChannel chan<- *sdk.SourceCodePullRequest, prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit) error {
 	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/pullRequests/%d/commits`, url.PathEscape(pr.Repository.ID), pr.PullRequestID)
 	var out struct {
 		Value []commitsResponseLight `json:"value"`
@@ -56,7 +57,7 @@ func (a *API) sendPullRequestCommits(projid string, pr pullRequestResponseWithSh
 				return err
 			}
 		}
-		a.sendPullRequest(projid, pr.Repository.ID, pr, prsChannel)
+		a.sendPullRequest(projid, reponame, pr.Repository.ID, pr, prsChannel)
 	}
 
 	return nil
