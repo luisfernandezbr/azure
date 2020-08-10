@@ -66,3 +66,13 @@ func (a *API) FetchIssueProjectRefs(hashed string) (projectID string, issueID in
 	}
 	return "", 0, errors.New("project id and issue id not found")
 }
+
+func appendUnique(slice []string, word string) []string {
+	for _, w := range slice {
+		if w == word {
+			return slice
+		}
+	}
+	slice = append(slice, word)
+	return slice
+}

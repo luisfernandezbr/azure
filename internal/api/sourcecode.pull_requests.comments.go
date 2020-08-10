@@ -27,13 +27,14 @@ func (a *API) sendPullRequestComment(projid string, repoRefID string, pr pullReq
 				refid := fmt.Sprintf("%d_%d", thread.ID, comment.ID)
 
 				c := &sdk.SourceCodePullRequestComment{
-					Body:          comment.Content,
-					CustomerID:    a.customerID,
-					PullRequestID: sdk.NewSourceCodePullRequestID(a.customerID, a.refType, prrefid, repoRefID),
-					RefID:         refid,
-					RefType:       a.refType,
-					RepoID:        sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
-					UserRefID:     comment.Author.ID,
+					Body:                  comment.Content,
+					CustomerID:            a.customerID,
+					IntegrationInstanceID: &a.integrationID,
+					PullRequestID:         sdk.NewSourceCodePullRequestID(a.customerID, a.refType, prrefid, repoRefID),
+					RefID:                 refid,
+					RefType:               a.refType,
+					RepoID:                sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
+					UserRefID:             comment.Author.ID,
 				}
 				sdk.ConvertTimeToDateModel(comment.PublishedDate, &c.CreatedDate)
 				sdk.ConvertTimeToDateModel(comment.LastUpdatedDate, &c.UpdatedDate)
@@ -59,14 +60,15 @@ func (a *API) sendPullRequestComment(projid string, repoRefID string, pr pullReq
 					}
 					refid := sdk.Hash(pr.PullRequestID, thread.ID, comment.ID)
 					review := &sdk.SourceCodePullRequestReview{
-						CustomerID:    a.customerID,
-						PullRequestID: sdk.NewSourceCodePullRequestID(a.customerID, prrefid, a.refType, repoRefID),
-						RefID:         refid,
-						RefType:       a.refType,
-						RepoID:        sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
-						State:         state,
-						URL:           pr.URL,
-						UserRefID:     thread.Identities["1"].ID,
+						CustomerID:            a.customerID,
+						IntegrationInstanceID: &a.integrationID,
+						PullRequestID:         sdk.NewSourceCodePullRequestID(a.customerID, prrefid, a.refType, repoRefID),
+						RefID:                 refid,
+						RefType:               a.refType,
+						RepoID:                sdk.NewSourceCodeRepoID(a.customerID, repoRefID, a.refType),
+						State:                 state,
+						URL:                   pr.URL,
+						UserRefID:             thread.Identities["1"].ID,
 					}
 					sdk.ConvertTimeToDateModel(comment.PublishedDate, &review.CreatedDate)
 					prReviewsChannel <- review

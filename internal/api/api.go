@@ -22,6 +22,8 @@ type API struct {
 	logger        sdk.Logger
 	creds         sdk.WithHTTPOption
 	state         sdk.State
+	// process_id - type_name - state_name
+	statusesMap map[string]map[string]map[string]string
 }
 
 // New creates a new instance of the api object
@@ -35,6 +37,7 @@ func New(logger sdk.Logger, client sdk.HTTPClient, state sdk.State, customerID, 
 		customerID:    customerID,
 		creds:         creds,
 		integrationID: integrationID,
+		statusesMap:   map[string]map[string]map[string]string{},
 	}
 }
 

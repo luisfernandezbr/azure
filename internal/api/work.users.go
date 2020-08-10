@@ -21,25 +21,27 @@ func (a *API) FetchUsers(projid string, teamids []string, workUsermap map[string
 	}
 	for _, u := range rawusers {
 		workUsermap[u.ID] = &sdk.WorkUser{
-			AvatarURL:  sdk.StringPointer(u.ImageURL),
-			CustomerID: a.customerID,
-			Name:       doubleSlashRegex.ReplaceAllString(u.DisplayName, ""),
-			Member:     true,
-			RefID:      u.ID,
-			RefType:    a.refType,
-			Username:   doubleSlashRegex.ReplaceAllString(u.UniqueName, ""),
-			URL:        sdk.StringPointer(u.URL),
+			AvatarURL:             sdk.StringPointer(u.ImageURL),
+			CustomerID:            a.customerID,
+			IntegrationInstanceID: &a.integrationID,
+			Name:                  doubleSlashRegex.ReplaceAllString(u.DisplayName, ""),
+			Member:                true,
+			RefID:                 u.ID,
+			RefType:               a.refType,
+			Username:              doubleSlashRegex.ReplaceAllString(u.UniqueName, ""),
+			URL:                   sdk.StringPointer(u.URL),
 		}
 		sourcecodeUsermap[u.ID] = &sdk.SourceCodeUser{
-			AvatarURL:  sdk.StringPointer(u.ImageURL),
-			CustomerID: a.customerID,
-			Name:       doubleSlashRegex.ReplaceAllString(u.DisplayName, ""),
-			Member:     true,
-			RefID:      u.ID,
-			RefType:    a.refType,
-			Username:   sdk.StringPointer(doubleSlashRegex.ReplaceAllString(u.UniqueName, "")),
-			Type:       sdk.SourceCodeUserTypeHuman,
-			URL:        sdk.StringPointer(u.URL),
+			AvatarURL:             sdk.StringPointer(u.ImageURL),
+			CustomerID:            a.customerID,
+			IntegrationInstanceID: &a.integrationID,
+			Name:                  doubleSlashRegex.ReplaceAllString(u.DisplayName, ""),
+			Member:                true,
+			RefID:                 u.ID,
+			RefType:               a.refType,
+			Username:              sdk.StringPointer(doubleSlashRegex.ReplaceAllString(u.UniqueName, "")),
+			Type:                  sdk.SourceCodeUserTypeHuman,
+			URL:                   sdk.StringPointer(u.URL),
 		}
 	}
 	return nil

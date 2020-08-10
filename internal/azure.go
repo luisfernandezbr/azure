@@ -143,10 +143,11 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	workUsermap := map[string]*sdk.WorkUser{}
 	sourcecodeUsermap := map[string]*sdk.SourceCodeUser{}
 	a := api.New(g.logger, client, state, customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
-
-	if err := a.FetchStatuses(statusesChannel); err != nil {
+	workconf, err := a.FetchStatuses(statusesChannel)
+	if err != nil {
 		return err
 	}
+	pipe.Write(workconf)
 
 	projects, err := a.FetchProjects()
 	if err != nil {
@@ -169,7 +170,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 		}
 		for _, r := range repos {
 			pipe.Write(r)
-			if err := a.FetchPullRequests(proj.RefID, r.RefID, updated, prsChannel, prCommitsChannel, prCommentsChannel, prReviewsChannel); err != nil {
+			if err := a.FetchPullRequests(proj.RefID, r.RefID, r.Name, updated, prsChannel, prCommitsChannel, prCommentsChannel, prReviewsChannel); err != nil {
 				return fmt.Errorf("error fetching pull requests repos. err: %v", err)
 			}
 		}
@@ -233,4 +234,8 @@ func (g *AzureIntegration) sendCapabilities(pipe sdk.Pipe, customerID, integrati
 		Sprints:               true,
 		StoryPoints:           true,
 	})
+}
+
+func (g *AzureIntegration) Validate(config sdk.Config) (result map[string]interface{}, err error) {
+	return nil, nil
 }
