@@ -236,6 +236,6 @@ func (g *AzureIntegration) sendCapabilities(pipe sdk.Pipe, customerID, integrati
 	})
 }
 
-func (g *AzureIntegration) Validate(config sdk.Config) (result map[string]interface{}, err error) {
+func (g *AzureIntegration) Validate(config sdk.Validate) (result map[string]interface{}, err error) {
 	return nil, nil
 }

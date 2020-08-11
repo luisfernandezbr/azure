@@ -178,5 +178,11 @@ func (a *API) sendPullRequest(projid string, reponame string, repoRefID string, 
 			pr.MergedByRefID = r.ID
 		}
 	}
+
+	pr.Labels = make([]string, 0)
+	for _, lbl := range p.Labels {
+		pr.Labels = append(pr.Labels, lbl.Name)
+	}
+
 	prsChannel <- pr
 }

@@ -245,6 +245,9 @@ type pullRequestResponse struct {
 	TargetBranch       string `json:"targetRefName"`
 	Title              string `json:"title"`
 	URL                string `json:"url"`
+	Labels             []struct {
+		Name string `json:"name"`
+	} `json:"labels"`
 }
 
 type pullRequestResponseWithShas struct {
