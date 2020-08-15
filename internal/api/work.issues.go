@@ -72,7 +72,7 @@ func (a *API) FetchStatuses(issueStatusChannel chan<- *sdk.WorkIssueStatus) (*sd
 						issueStatusChannel <- &sdk.WorkIssueStatus{
 							CustomerID:            a.customerID,
 							Description:           state.StateCategory,
-							IntegrationInstanceID: &a.integrationID,
+							IntegrationInstanceID: &a.instanceID,
 							Name:                  state.Name,
 							RefID:                 state.ID,
 							RefType:               a.refType,
@@ -102,7 +102,7 @@ func (a *API) FetchStatuses(issueStatusChannel chan<- *sdk.WorkIssueStatus) (*sd
 	err := async.Wait()
 	workconf := &sdk.WorkConfig{
 		CustomerID:            a.customerID,
-		IntegrationInstanceID: a.integrationID,
+		IntegrationInstanceID: a.instanceID,
 		RefType:               a.refType,
 		Statuses:              statuses,
 	}
@@ -209,7 +209,7 @@ func (a *API) FetchIssues(projid string, ids []string, issueChannel chan<- *sdk.
 				CreatorRefID:          fields.CreatedBy.ID,
 				CustomerID:            a.customerID,
 				Description:           fields.Description,
-				IntegrationInstanceID: &a.integrationID,
+				IntegrationInstanceID: &a.instanceID,
 				Identifier:            fmt.Sprintf("%s-%d", fields.TeamProject, item.ID),
 				Priority:              fmt.Sprint(fields.Priority),
 				ProjectID:             sdk.NewWorkProjectID(a.customerID, projid, a.refType),

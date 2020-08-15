@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Icon, Loader } from '@pinpt/uic.next';
+import { Icon, Loader, Error as ErrorMessage } from '@pinpt/uic.next';
 import {
 	useIntegration,
 	Account,
@@ -14,120 +14,47 @@ import {
 	Http,
 	IOAuth2Auth,
 	Config,
+	ConfigAccount,
 } from '@pinpt/agent.websdk';
 
 import styles from './styles.module.less';
 
-interface project {
-	id: string;
-	name: string;
-	description: string;
-	visibility: string;
-}
+const AccountList = () => {
 
-interface repo {
-	id: string;
-	name: string;
-}
-
-async function fetchProjects(auth: IAuth): Promise<project[]> {
-	try {
-		let url = auth.url + '/_apis/projects?api-version=5.1';
-		let res = await Http.get(url, { 'Authorization': createAuthHeader(auth) });
-		if (res[1] === 200) {
-			return res[0].value;
-		}
-		throw new Error('error fetching projects, status code' + res[1]);
-	} catch (err) {
-		throw new Error('error fetching projects, check url and api key');
-	}
-}
-async function fetchRepos(projid: string, auth: IAuth): Promise<repo[]> {
-	try {
-		let url = auth.url + '/' + projid + '/_apis/git/repositories?api-version=5.1';
-		let res = await Http.get(url, { 'Authorization': createAuthHeader(auth) });
-		if (res[1] === 200) {
-			return res[0].value;
-		}
-		throw new Error('error fetching repos, status code' + res[1]);
-	} catch (err) {
-		throw new Error('error fetching repos ' + err.message);
-	}
-}
-function createAuthHeader(auth: IAuth): string {
-	if ('apikey' in auth) {
-		let a = (auth as IAPIKeyAuth);
-		return 'Basic ' + btoa(':' + a.apikey);
-	}
-	let a = (auth as IOAuth2Auth);
-	return 'Bearer ' + a.access_token;
-}
-
-const AccountList = ({ projects, setProjects }: { projects: project[], setProjects: (val: project[]) => void }) => {
-
-	const { config, setConfig, installed, setInstallEnabled } = useIntegration();
-	const [fetching, setFetching] = useState(false);
+	const { config, setValidate, setInstallEnabled } = useIntegration();
 	const [accounts, setAccounts] = useState<Account[]>([]);
-
-	let auth: IAuth
-	if (config.apikey_auth) {
-		auth = config.apikey_auth as IAPIKeyAuth;
-	} else {
-		auth = config.oauth2_auth as IOAuth2Auth;
-	}
+	const [error, setError] = useState<Error | undefined>();
 
 	useEffect(() => {
-		if (fetching || accounts.length || !projects.length) {
-			return;
-		}
-		setFetching(true);
-		const fetch = async () => {
-			config.accounts = {};
-			for (var i = 0; i < projects.length; i++) {
-				let proj = projects[i];
-				let res: repo[];
-				try {
-					res = await fetchRepos(proj.id, auth!);
-				} catch (err) {
-					console.error(err);
-					return;
-				}
-				let acc: Account = {
-					id: proj.id,
-					name: proj.name,
-					description: proj.description,
-					avatarUrl: '',
-					totalCount: res.length,
-					type: 'ORG',
-					public: proj.visibility === 'public',
-				};
-				accounts.push(acc);
-				config.accounts[proj.id] = acc;
-			}
-			setConfig(config);
-			setAccounts(accounts);
-			if (!installed && accounts.length > 0) {
-				setInstallEnabled(true);
-			}
-			setFetching(false);
-		}
-		fetch();
-	}, [projects]);
-
-	useEffect(() => {
-		if (projects.length) {
-			return
-		}
-		const fetch = async () => {
+		const run = async () => {
 			try {
-				var res = await fetchProjects(auth!);
-				setProjects(res);
+				const res = await setValidate(config);
+				const result = res as Record<string, Account>;
+				const accts: Account[] = [];
+				config.accounts = {};
+				for (let key in result) {
+					const acct = result[key];
+					accts.push(acct);
+					config.accounts[key] = {
+						id: acct.id,
+						type: acct.type,
+						public: acct.public
+					};
+				}
+				setAccounts(accts);
+				setInstallEnabled(Object.keys(config.accounts).length > 0);
 			} catch (err) {
-				console.error('error fetching projects. responde code', err);
+				console.error(err);
+				setError(err);
 			}
 		}
-		fetch();
-	}, [config.apikey_auth, config.oauth2_auth]);
+		run()
+	}, []);
+
+
+	if (error) {
+		return <ErrorMessage message={error.message} error={error} />;
+	}
 
 	return (
 		<AccountsTable
@@ -155,11 +82,14 @@ const LocationSelector = ({ setType }: { setType: (val: IntegrationType) => void
 	);
 };
 
-const SelfManagedForm = ({ setProjects }: { setProjects: (val: project[]) => void }) => {
+const SelfManagedForm = () => {
+	const { setValidate } = useIntegration();
 	async function verify(auth: IAuth) {
 		try {
-			var res = await fetchProjects(auth!);
-			setProjects(res);
+			const config: Config = {
+				apikey_auth: auth as IAPIKeyAuth,
+			};
+			await setValidate(config);
 		} catch (err) {
 			throw new Error(err.message)
 		}
@@ -168,11 +98,9 @@ const SelfManagedForm = ({ setProjects }: { setProjects: (val: project[]) => voi
 };
 
 const Integration = () => {
-	const { loading, currentURL, config, isFromRedirect, isFromReAuth, setConfig } = useIntegration();
+	const { loading, currentURL, config, isFromRedirect, isFromReAuth, setConfig, setValidate } = useIntegration();
 	const [type, setType] = useState<IntegrationType | undefined>(config.integration_type);
 	const [, setRerender] = useState(0);
-	const [projects, setProjects] = useState<project[]>([]);
-
 	// ============= OAuth 2.0 =============
 	useEffect(() => {
 		if (!loading && isFromRedirect && currentURL) {
@@ -189,6 +117,7 @@ const Integration = () => {
 						access_token: profile.Integration.auth.accessToken,
 						refresh_token: profile.Integration.auth.refreshToken,
 						scopes: profile.Integration.auth.scopes,
+						date_ts: Date.now(),
 					};
 					setConfig(config);
 					setRerender(Date.now());
@@ -215,7 +144,7 @@ const Integration = () => {
 		if (config.integration_type === IntegrationType.CLOUD) {
 			content = <OAuthConnect name='Azure DevOps' reauth />
 		} else {
-			content = <SelfManagedForm setProjects={setProjects} />;
+			content = <SelfManagedForm />;
 		}
 	} else {
 		if (!config.integration_type) {
@@ -223,9 +152,9 @@ const Integration = () => {
 		} else if (config.integration_type === IntegrationType.CLOUD && !config.oauth2_auth) {
 			content = <OAuthConnect name='Azure DevOps' />;
 		} else if (config.integration_type === IntegrationType.SELFMANAGED && !config.basic_auth && !config.apikey_auth) {
-			content = <SelfManagedForm setProjects={setProjects} />;
+			content = <SelfManagedForm />;
 		} else {
-			content = <AccountList projects={projects} setProjects={setProjects} />
+			content = <AccountList />
 		}
 	}
 

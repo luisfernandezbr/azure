@@ -69,21 +69,23 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	pipe := export.Pipe()
 	state := export.State()
 	customerID := export.CustomerID()
-	integrationID := export.IntegrationInstanceID()
+	instanceID := export.IntegrationInstanceID()
 
 	sdk.LogDebug(g.logger, "export starting")
 
 	config := export.Config()
-	// instance := sdk.NewInstance(config, state, pipe, customerID, export.IntegrationInstanceID())
-	// if err := g.Enroll(*instance); err != nil {
-	// 	return err
-	// }
-	// os.Exit(1)
-	auth := config.APIKeyAuth
-	if auth == nil {
-		return errors.New("Missing --apikey_auth")
+	var creds sdk.WithHTTPOption
+	var authurl string
+	if config.APIKeyAuth != nil {
+		creds = sdk.WithBasicAuth("", config.APIKeyAuth.APIKey)
+		authurl = config.APIKeyAuth.URL
+	} else if config.OAuth2Auth != nil {
+		creds = sdk.WithOAuth2Refresh(g.manager, g.refType, config.OAuth2Auth.AccessToken, *config.OAuth2Auth.RefreshToken)
+		authurl = "https://dev.azure.com/"
+	} else {
+		return errors.New("missing auth")
 	}
-	client := g.manager.HTTPManager().New(auth.URL, nil)
+	client := g.manager.HTTPManager().New(authurl, nil)
 	ok, concurr := config.GetInt("concurrency")
 	if !ok {
 		concurr = 10
@@ -142,7 +144,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 
 	workUsermap := map[string]*sdk.WorkUser{}
 	sourcecodeUsermap := map[string]*sdk.SourceCodeUser{}
-	a := api.New(g.logger, client, state, customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+	a := api.New(g.logger, client, state, customerID, instanceID, g.refType, concurr, creds)
 	workconf, err := a.FetchStatuses(statusesChannel)
 	if err != nil {
 		return err
@@ -156,7 +158,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 
 	for _, proj := range projects {
 
-		g.sendCapabilities(pipe, customerID, integrationID, proj.RefID)
+		g.sendCapabilities(pipe, customerID, instanceID, proj.RefID)
 		pipe.Write(proj)
 
 		var updated time.Time
@@ -214,7 +216,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	return err
 }
 
-func (g *AzureIntegration) sendCapabilities(pipe sdk.Pipe, customerID, integrationID, projid string) {
+func (g *AzureIntegration) sendCapabilities(pipe sdk.Pipe, customerID, instanceID, projid string) {
 	pipe.Write(&sdk.WorkProjectCapability{
 		Attachments:           false,
 		ChangeLogs:            true,
@@ -222,7 +224,7 @@ func (g *AzureIntegration) sendCapabilities(pipe sdk.Pipe, customerID, integrati
 		DueDates:              true,
 		Epics:                 false,
 		InProgressStates:      true,
-		IntegrationInstanceID: &integrationID,
+		IntegrationInstanceID: &instanceID,
 		KanbanBoards:          false,
 		LinkedIssues:          false,
 		Parents:               false,
@@ -236,6 +238,54 @@ func (g *AzureIntegration) sendCapabilities(pipe sdk.Pipe, customerID, integrati
 	})
 }
 
-func (g *AzureIntegration) Validate(config sdk.Validate) (result map[string]interface{}, err error) {
-	return nil, nil
+type validateObject struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	AvatarURL   string `json:"avatarUrl"`
+	TotalCount  int64  `json:"totalCount"`
+	Type        string `json:"type"`
+	Public      bool   `json:"public"`
+}
+
+func (g *AzureIntegration) Validate(validate sdk.Validate) (map[string]interface{}, error) {
+
+	result := make(map[string]interface{})
+	customerID := validate.CustomerID()
+	instanceID := validate.IntegrationInstanceID()
+	refType := validate.RefType()
+	config := validate.Config()
+
+	var creds sdk.WithHTTPOption
+	var authurl string
+	if config.APIKeyAuth != nil {
+		creds = sdk.WithBasicAuth("", config.APIKeyAuth.APIKey)
+		authurl = config.APIKeyAuth.URL
+	} else if config.OAuth2Auth != nil {
+		creds = sdk.WithOAuth2Refresh(g.manager, refType, config.OAuth2Auth.AccessToken, *config.OAuth2Auth.RefreshToken)
+		authurl = "https://dev.azure.com/"
+	} else {
+		return nil, errors.New("missing auth")
+	}
+	client := g.manager.HTTPManager().New(authurl, nil)
+	a := api.New(g.logger, client, nil, customerID, instanceID, refType, 10, creds)
+	projs, err := a.FetchProjects()
+	if err != nil {
+		return nil, err
+	}
+	for _, prj := range projs {
+		repos, err := a.FetchRepos(prj.RefID)
+		if err != nil {
+			return nil, err
+		}
+		result[prj.RefID] = validateObject{
+			ID:          prj.RefID,
+			Name:        prj.Name,
+			Description: *prj.Description,
+			TotalCount:  int64(len(repos)),
+			Type:        "ORG",
+			Public:      false,
+		}
+	}
+	return result, nil
 }

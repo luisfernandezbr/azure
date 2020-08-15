@@ -31,7 +31,7 @@ func (a *API) FetchProjects() ([]*sdk.WorkProject, error) {
 			Active:                proj.State == "wellFormed",
 			CustomerID:            a.customerID,
 			Description:           &proj.Description,
-			IntegrationInstanceID: &a.integrationID,
+			IntegrationInstanceID: &a.instanceID,
 			Identifier:            proj.Name,
 			Name:                  proj.Name,
 			RefID:                 proj.ID,

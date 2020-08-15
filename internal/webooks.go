@@ -37,7 +37,7 @@ func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
 
 	pipe := webhook.Pipe()
 	config := webhook.Config()
-	integrationID := webhook.IntegrationInstanceID()
+	instanceID := webhook.IntegrationInstanceID()
 
 	ok, concurr := config.GetInt("concurrency")
 	if !ok {
@@ -52,7 +52,7 @@ func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
 	customerID := webhook.CustomerID()
 	rawPayload := webhook.Bytes()
 
-	a := api.New(g.logger, client, webhook.State(), customerID, integrationID, g.refType, concurr, basicAuth)
+	a := api.New(g.logger, client, webhook.State(), customerID, instanceID, g.refType, concurr, basicAuth)
 
 	if strings.HasPrefix(payload.EventType, "workitem.") {
 		return g.handleWorkWebHooks(customerID, webhook.IntegrationInstanceID(), payload.EventType, rawPayload, pipe, a)
@@ -119,12 +119,12 @@ func (g *AzureIntegration) handleWorkWebHooks(customerID, intID, eventType strin
 func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64) error {
 
 	customerID := instance.CustomerID()
-	integrationID := instance.IntegrationInstanceID()
+	instanceID := instance.IntegrationInstanceID()
 	state := instance.State()
 	auth := instance.Config().APIKeyAuth
 
 	client := g.manager.HTTPManager().New(auth.URL, nil)
-	a := api.New(g.logger, client, instance.State(), customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+	a := api.New(g.logger, client, instance.State(), customerID, instanceID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
 
 	// fetch projects
 	projects, err := a.FetchProjects()
@@ -134,8 +134,8 @@ func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64
 	webhookManager := g.manager.WebHookManager()
 
 	for _, proj := range projects {
-		if webhookManager.Exists(customerID, integrationID, g.refType, proj.RefID, sdk.WebHookScopeProject) {
-			url, err := webhookManager.HookURL(customerID, integrationID, g.refType, proj.RefID, sdk.WebHookScopeProject)
+		if webhookManager.Exists(customerID, instanceID, g.refType, proj.RefID, sdk.WebHookScopeProject) {
+			url, err := webhookManager.HookURL(customerID, instanceID, g.refType, proj.RefID, sdk.WebHookScopeProject)
 			if err != nil {
 				return err
 			}
@@ -145,7 +145,7 @@ func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64
 				continue
 			}
 			var removed bool
-			if removed, err = g.removeWebHook(webhookManager, a, state, customerID, integrationID, proj.RefID); err != nil {
+			if removed, err = g.removeWebHook(webhookManager, a, state, customerID, instanceID, proj.RefID); err != nil {
 				return err
 			}
 			if !removed {
@@ -153,7 +153,7 @@ func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64
 			}
 		}
 
-		url, err := webhookManager.Create(customerID, integrationID, g.refType, proj.RefID, sdk.WebHookScopeProject, "version="+webhookVersion)
+		url, err := webhookManager.Create(customerID, instanceID, g.refType, proj.RefID, sdk.WebHookScopeProject, "version="+webhookVersion)
 		if err != nil {
 			return err
 		}
@@ -161,7 +161,7 @@ func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64
 		ids, err := a.CreateWebhook(url, proj.RefID)
 		if err != nil {
 			sdk.LogError(g.logger, "error creating webhook", "err", err)
-			webhookManager.Errored(customerID, integrationID, g.refType, proj.RefID, sdk.WebHookScopeProject, err)
+			webhookManager.Errored(customerID, instanceID, g.refType, proj.RefID, sdk.WebHookScopeProject, err)
 			continue
 		}
 		if err := state.Set("webhooks_"+proj.RefID, ids); err != nil {
@@ -173,12 +173,12 @@ func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64
 
 func (g *AzureIntegration) unregisterWebHooks(instance sdk.Instance, concurr int64) error {
 	customerID := instance.CustomerID()
-	integrationID := instance.IntegrationInstanceID()
+	instanceID := instance.IntegrationInstanceID()
 	state := instance.State()
 	auth := instance.Config().APIKeyAuth
 
 	client := g.manager.HTTPManager().New(auth.URL, nil)
-	a := api.New(g.logger, client, instance.State(), customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+	a := api.New(g.logger, client, instance.State(), customerID, instanceID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
 
 	// fetch projects
 	projects, err := a.FetchProjects()
@@ -188,7 +188,7 @@ func (g *AzureIntegration) unregisterWebHooks(instance sdk.Instance, concurr int
 	webhookManager := g.manager.WebHookManager()
 
 	for _, proj := range projects {
-		if _, err := g.removeWebHook(webhookManager, a, state, customerID, integrationID, proj.RefID); err != nil {
+		if _, err := g.removeWebHook(webhookManager, a, state, customerID, instanceID, proj.RefID); err != nil {
 			return err
 		}
 	}
@@ -196,12 +196,12 @@ func (g *AzureIntegration) unregisterWebHooks(instance sdk.Instance, concurr int
 	return nil
 }
 
-func (g *AzureIntegration) removeWebHook(webhookManager sdk.WebHookManager, a *api.API, state sdk.State, customerID, integrationID, projid string) (bool, error) {
+func (g *AzureIntegration) removeWebHook(webhookManager sdk.WebHookManager, a *api.API, state sdk.State, customerID, instanceID, projid string) (bool, error) {
 	var ids []string
 	if ok, err := state.Get("webhooks_"+projid, &ids); ok {
 		if err := a.DeleteWebhooks(ids); err != nil {
 			sdk.LogError(g.logger, "error removing webhook", "err", err)
-			webhookManager.Errored(customerID, integrationID, g.refType, projid, sdk.WebHookScopeProject, err)
+			webhookManager.Errored(customerID, instanceID, g.refType, projid, sdk.WebHookScopeProject, err)
 			return false, nil
 		}
 	} else if err != nil {
@@ -210,7 +210,7 @@ func (g *AzureIntegration) removeWebHook(webhookManager sdk.WebHookManager, a *a
 	if err := state.Delete("webhooks_" + projid); err != nil {
 		return false, err
 	}
-	if err := webhookManager.Delete(customerID, integrationID, g.refType, projid, sdk.WebHookScopeProject); err != nil {
+	if err := webhookManager.Delete(customerID, instanceID, g.refType, projid, sdk.WebHookScopeProject); err != nil {
 		return false, err
 	}
 	return true, nil

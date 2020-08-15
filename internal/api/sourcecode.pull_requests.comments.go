@@ -29,7 +29,7 @@ func (a *API) sendPullRequestComment(projid string, repoRefID string, pr pullReq
 				c := &sdk.SourceCodePullRequestComment{
 					Body:                  comment.Content,
 					CustomerID:            a.customerID,
-					IntegrationInstanceID: &a.integrationID,
+					IntegrationInstanceID: &a.instanceID,
 					PullRequestID:         sdk.NewSourceCodePullRequestID(a.customerID, a.refType, prrefid, repoRefID),
 					RefID:                 refid,
 					RefType:               a.refType,
@@ -61,7 +61,7 @@ func (a *API) sendPullRequestComment(projid string, repoRefID string, pr pullReq
 					refid := sdk.Hash(pr.PullRequestID, thread.ID, comment.ID)
 					review := &sdk.SourceCodePullRequestReview{
 						CustomerID:            a.customerID,
-						IntegrationInstanceID: &a.integrationID,
+						IntegrationInstanceID: &a.instanceID,
 						PullRequestID:         sdk.NewSourceCodePullRequestID(a.customerID, prrefid, a.refType, repoRefID),
 						RefID:                 refid,
 						RefType:               a.refType,

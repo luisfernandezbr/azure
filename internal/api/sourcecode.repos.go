@@ -34,7 +34,7 @@ func (a *API) FetchRepos(projid string) ([]*sdk.SourceCodeRepo, error) {
 			Active:                true,
 			CustomerID:            a.customerID,
 			DefaultBranch:         strings.TrimPrefix(repo.DefaultBranch, "refs/heads/"),
-			IntegrationInstanceID: &a.integrationID,
+			IntegrationInstanceID: &a.instanceID,
 			Name:                  reponame,
 			RefID:                 repo.ID,
 			RefType:               a.refType,

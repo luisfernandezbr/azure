@@ -23,7 +23,7 @@ func (a *API) FetchUsers(projid string, teamids []string, workUsermap map[string
 		workUsermap[u.ID] = &sdk.WorkUser{
 			AvatarURL:             sdk.StringPointer(u.ImageURL),
 			CustomerID:            a.customerID,
-			IntegrationInstanceID: &a.integrationID,
+			IntegrationInstanceID: &a.instanceID,
 			Name:                  doubleSlashRegex.ReplaceAllString(u.DisplayName, ""),
 			Member:                true,
 			RefID:                 u.ID,
@@ -34,7 +34,7 @@ func (a *API) FetchUsers(projid string, teamids []string, workUsermap map[string
 		sourcecodeUsermap[u.ID] = &sdk.SourceCodeUser{
 			AvatarURL:             sdk.StringPointer(u.ImageURL),
 			CustomerID:            a.customerID,
-			IntegrationInstanceID: &a.integrationID,
+			IntegrationInstanceID: &a.instanceID,
 			Name:                  doubleSlashRegex.ReplaceAllString(u.DisplayName, ""),
 			Member:                true,
 			RefID:                 u.ID,

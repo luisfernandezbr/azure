@@ -27,7 +27,7 @@ func (a *API) fetchComments(projid string, issueid int, issueCommentChannel chan
 				comment := &sdk.WorkIssueComment{
 					Body:                  raw.Text,
 					CustomerID:            a.customerID,
-					IntegrationInstanceID: &a.integrationID,
+					IntegrationInstanceID: &a.instanceID,
 					IssueID:               sdk.NewWorkIssueID(a.customerID, a.createIssueID(projid, issueid), a.refType),
 					ProjectID:             sdk.NewWorkProjectID(a.customerID, projid, a.refType),
 					RefID:                 fmt.Sprint(raw.ID),

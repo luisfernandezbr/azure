@@ -25,7 +25,7 @@ func (a *API) sendPullRequestCommit(projid string, repoRefID string, p pullReque
 		CommitterRefID:        out.Push.PushedBy.ID,
 		CustomerID:            a.customerID,
 		Deletions:             out.ChangeCounts.Delete,
-		IntegrationInstanceID: &a.integrationID,
+		IntegrationInstanceID: &a.instanceID,
 		Message:               out.Comment,
 		PullRequestID:         sdk.NewSourceCodePullRequestID(a.customerID, prrefid, a.refType, repoRefID),
 		RefID:                 sha,

@@ -14,30 +14,30 @@ import (
 
 // API the api object
 type API struct {
-	customerID    string
-	integrationID string
-	refType       string
-	client        sdk.HTTPClient
-	concurrency   int
-	logger        sdk.Logger
-	creds         sdk.WithHTTPOption
-	state         sdk.State
+	customerID  string
+	instanceID  string
+	refType     string
+	client      sdk.HTTPClient
+	concurrency int
+	logger      sdk.Logger
+	creds       sdk.WithHTTPOption
+	state       sdk.State
 	// process_id - type_name - state_name
 	statusesMap map[string]map[string]map[string]string
 }
 
 // New creates a new instance of the api object
-func New(logger sdk.Logger, client sdk.HTTPClient, state sdk.State, customerID, integrationID, refType string, concurrency int64, creds sdk.WithHTTPOption) *API {
+func New(logger sdk.Logger, client sdk.HTTPClient, state sdk.State, customerID, instanceID, refType string, concurrency int64, creds sdk.WithHTTPOption) *API {
 	return &API{
-		client:        client,
-		state:         state,
-		concurrency:   int(concurrency),
-		logger:        logger,
-		refType:       refType,
-		customerID:    customerID,
-		creds:         creds,
-		integrationID: integrationID,
-		statusesMap:   map[string]map[string]map[string]string{},
+		client:      client,
+		state:       state,
+		concurrency: int(concurrency),
+		logger:      logger,
+		refType:     refType,
+		customerID:  customerID,
+		creds:       creds,
+		instanceID:  instanceID,
+		statusesMap: map[string]map[string]map[string]string{},
 	}
 }
 
