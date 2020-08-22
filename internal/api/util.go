@@ -19,6 +19,7 @@ type issueProjectRefs struct {
 	IssueID   int    `json:"issue_id"`
 	ProjectID string `json:"project_id"`
 }
+
 type pullRequestRepoProjectRefs struct {
 	ProjectID     string `json:"project_id"`
 	RepoID        string `json:"repo_id"`

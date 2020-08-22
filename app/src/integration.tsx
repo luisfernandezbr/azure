@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Icon, Loader } from '@pinpt/uic.next';
 import {
 	useIntegration,
@@ -6,14 +6,12 @@ import {
 	AccountsTable,
 	IntegrationType,
 	OAuthConnect,
-	Graphql,
 	IAuth,
 	IAPIKeyAuth,
 	Form,
 	FormType,
 	Http,
 	IOAuth2Auth,
-	Config,
 } from '@pinpt/agent.websdk';
 
 import styles from './styles.module.less';
@@ -185,6 +183,7 @@ const Integration = () => {
 				if (k === 'profile') {
 					const profile = JSON.parse(atob(decodeURIComponent(v)));
 					config.oauth2_auth = {
+						date_ts: Date.now(),
 						url: 'https://dev.azure.org',
 						access_token: profile.Integration.auth.accessToken,
 						refresh_token: profile.Integration.auth.refreshToken,
