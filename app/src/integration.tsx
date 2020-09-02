@@ -7,13 +7,9 @@ import {
 	IntegrationType,
 	OAuthConnect,
 	IAuth,
-	IAPIKeyAuth,
 	Form,
 	FormType,
-	Http,
-	IOAuth2Auth,
 	ConfigAccount,
-	Config,
 	APIKeyAuth,
 } from '@pinpt/agent.websdk';
 
@@ -37,7 +33,7 @@ interface validationResponse {
 
 const AccountList = ({ accounts, setAccounts }: { accounts: Account[], setAccounts: (val: Account[]) => void }) => {
 
-	const { config, setConfig, installed, setInstallEnabled, setValidate, processingDetail } = useIntegration();
+	const { config, setValidate } = useIntegration();
 
 	useEffect(() => {
 		if (accounts == null) {
