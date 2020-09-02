@@ -14,6 +14,7 @@ import {
 	IOAuth2Auth,
 	ConfigAccount,
 	Config,
+	APIKeyAuth,
 } from '@pinpt/agent.websdk';
 
 import styles from './styles.module.less';
@@ -76,11 +77,13 @@ const LocationSelector = ({ setType }: { setType: (val: IntegrationType) => void
 };
 
 const SelfManagedForm = ({ setAccounts }: { setAccounts: (val: Account[]) => void }) => {
-	const { setValidate, config } = useIntegration();
+	const { setValidate, config, setConfig } = useIntegration();
 	async function verify(auth: IAuth) {
 		try {
 			let data: validationResponse;
+			config.apikey_auth = auth as APIKeyAuth
 			data = await setValidate(config);
+			setConfig(config)
 			setAccounts(data.accounts.map((acct) => toAccount(acct)));
 		} catch (err) {
 			throw new Error(err.message);
