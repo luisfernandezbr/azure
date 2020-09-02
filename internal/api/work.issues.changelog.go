@@ -14,8 +14,6 @@ import (
 
 func (a *API) fetchChangeLog(itemtype, projid string, issueid int) ([]sdk.WorkIssueChangeLog, time.Time, error) {
 
-	sdk.LogInfo(a.logger, "fetching issues changelogs for project", "project_id", projid, "issue_id", issueid)
-
 	params := url.Values{}
 	params.Set("$top", "200")
 	endpoint := fmt.Sprintf("_apis/wit/workItems/%s/updates", url.PathEscape(fmt.Sprint(issueid)))

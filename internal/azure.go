@@ -2,8 +2,6 @@ package internal
 
 import (
 	"errors"
-	"fmt"
-	"time"
 
 	"github.com/pinpt/agent.next.azure/internal/api"
 	"github.com/pinpt/agent.next/sdk"
@@ -57,185 +55,94 @@ func (g *AzureIntegration) Dismiss(instance sdk.Instance) error {
 	return g.unregisterWebHooks(instance, concurr)
 }
 
+func (g *AzureIntegration) getHTTPCredOpts(config sdk.Config) (string, sdk.WithHTTPOption, error) {
+	if auth := config.APIKeyAuth; auth != nil {
+		sdk.LogInfo(g.logger, "using basic auth")
+		return auth.URL, sdk.WithBasicAuth("", auth.APIKey), nil
+	}
+	if auth := config.OAuth2Auth; auth != nil {
+		sdk.LogInfo(g.logger, "using oauth2")
+		return auth.URL, sdk.WithOAuth2Refresh(
+			g.manager, g.refType,
+			auth.AccessToken,
+			*auth.RefreshToken,
+		), nil
+	}
+	return "", nil, errors.New("missing auth")
+}
+
+func (g *AzureIntegration) fetchAccounts(customerID, integrationID string, config sdk.Config) (*sdk.Config, error) {
+	url, creds, err := g.getHTTPCredOpts(config)
+	if err != nil {
+		return nil, err
+	}
+	ok, concurr := config.GetInt("concurrency")
+	if !ok {
+		concurr = 10
+	}
+	client := g.manager.HTTPManager().New(url, nil)
+	a := api.New(g.logger, client, nil, customerID, integrationID, g.refType, concurr, creds)
+	projects, err := a.FetchProjects()
+	if err != nil {
+		return nil, err
+	}
+	var accounts []*sdk.ConfigAccount
+	for _, proj := range projects {
+		repos, err := a.FetchRepos(proj.RefID)
+		if err != nil {
+			return nil, err
+		}
+		count := int64(len(repos))
+		accounts = append(accounts, &sdk.ConfigAccount{
+			ID:          proj.RefID,
+			Name:        &proj.Name,
+			Description: proj.Description,
+			TotalCount:  &count,
+			Type:        sdk.ConfigAccountTypeOrg,
+			Public:      proj.Visibility == sdk.WorkProjectVisibilityPublic,
+		})
+	}
+
+	res := sdk.ConfigAccounts{}
+	for _, account := range accounts {
+		res[account.ID] = account
+	}
+	config.Accounts = &res
+	return &config, nil
+}
+
+// AutoConfigure is called when a cloud integration has requested to be auto configured
+func (g *AzureIntegration) AutoConfigure(autoconfig sdk.AutoConfigure) (*sdk.Config, error) {
+	customerID := autoconfig.CustomerID()
+	integrationID := autoconfig.IntegrationInstanceID()
+	config := autoconfig.Config()
+
+	return g.fetchAccounts(customerID, integrationID, config)
+}
+
 // Stop is called when the integration is shutting down for cleanup
 func (g *AzureIntegration) Stop() error {
 	sdk.LogInfo(g.logger, "stopping")
 	return nil
 }
 
-// Export is called to tell the integration to run an export
-func (g *AzureIntegration) Export(export sdk.Export) error {
-	sdk.LogInfo(g.logger, "export started")
-	pipe := export.Pipe()
-	state := export.State()
-	customerID := export.CustomerID()
-	integrationID := export.IntegrationInstanceID()
+func (g *AzureIntegration) Validate(validate sdk.Validate) (result map[string]interface{}, err error) {
 
-	sdk.LogDebug(g.logger, "export starting")
+	customerID := validate.CustomerID()
+	integrationID := validate.IntegrationInstanceID()
+	config := validate.Config()
 
-	config := export.Config()
-	// instance := sdk.NewInstance(config, state, pipe, customerID, export.IntegrationInstanceID())
-	// if err := g.Enroll(*instance); err != nil {
-	// 	return err
-	// }
-	// os.Exit(1)
-	auth := config.APIKeyAuth
-	if auth == nil {
-		return errors.New("Missing --apikey_auth")
-	}
-	client := g.manager.HTTPManager().New(auth.URL, nil)
-	ok, concurr := config.GetInt("concurrency")
-	if !ok {
-		concurr = 10
-	}
-
-	prsChannel := make(chan *sdk.SourceCodePullRequest, concurr)
-	go func() {
-		for each := range prsChannel {
-			pipe.Write(each)
-		}
-	}()
-	prCommitsChannel := make(chan *sdk.SourceCodePullRequestCommit, concurr)
-	go func() {
-		for each := range prCommitsChannel {
-			pipe.Write(each)
-		}
-	}()
-	prCommentsChannel := make(chan *sdk.SourceCodePullRequestComment, concurr)
-	go func() {
-		for each := range prCommentsChannel {
-			pipe.Write(each)
-		}
-	}()
-	prReviewsChannel := make(chan *sdk.SourceCodePullRequestReview, concurr)
-	go func() {
-		for each := range prReviewsChannel {
-			pipe.Write(each)
-		}
-	}()
-
-	issueChannel := make(chan *sdk.WorkIssue, concurr)
-	go func() {
-		for each := range issueChannel {
-			pipe.Write(each)
-		}
-	}()
-	issueCommentChannel := make(chan *sdk.WorkIssueComment, concurr)
-	go func() {
-		for each := range issueCommentChannel {
-			pipe.Write(each)
-		}
-	}()
-	sprintChannel := make(chan *sdk.AgileSprint, concurr)
-	go func() {
-		for each := range sprintChannel {
-			pipe.Write(each)
-		}
-	}()
-
-	statusesChannel := make(chan *sdk.WorkIssueStatus, concurr)
-	go func() {
-		for each := range statusesChannel {
-			pipe.Write(each)
-		}
-	}()
-
-	workUsermap := map[string]*sdk.WorkUser{}
-	sourcecodeUsermap := map[string]*sdk.SourceCodeUser{}
-	a := api.New(g.logger, client, state, customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
-	workconf, err := a.FetchStatuses(statusesChannel)
+	conf, err := g.fetchAccounts(customerID, integrationID, config)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	pipe.Write(workconf)
-
-	projects, err := a.FetchProjects()
-	if err != nil {
-		return fmt.Errorf("error fetching projects. err: %v", err)
+	var accts []*sdk.ConfigAccount
+	for _, each := range *conf.Accounts {
+		accts = append(accts, each)
 	}
 
-	for _, proj := range projects {
+	return map[string]interface{}{
+		"accounts": accts,
+	}, nil
 
-		g.sendCapabilities(pipe, customerID, integrationID, proj.RefID)
-		pipe.Write(proj)
-
-		var updated time.Time
-		var strTime string
-		if ok, _ := state.Get("updated_"+proj.RefID, &strTime); ok {
-			updated, _ = time.Parse(time.RFC3339Nano, strTime)
-		}
-		repos, err := a.FetchRepos(proj.RefID)
-		if err != nil {
-			return fmt.Errorf("error fetching repos. err: %v", err)
-		}
-		for _, r := range repos {
-			pipe.Write(r)
-			if err := a.FetchPullRequests(proj.RefID, r.RefID, r.Name, updated, prsChannel, prCommitsChannel, prCommentsChannel, prReviewsChannel); err != nil {
-				return fmt.Errorf("error fetching pull requests repos. err: %v", err)
-			}
-		}
-
-		ids, err := a.FetchTeams(proj.RefID)
-		if err != nil {
-			return fmt.Errorf("error fetching teams. err: %v", err)
-		}
-		if err := a.FetchUsers(proj.RefID, ids, workUsermap, sourcecodeUsermap); err != nil {
-			return fmt.Errorf("error fetching users. err: %v", err)
-		}
-		if err := a.FetchSprints(proj.RefID, ids, sprintChannel); err != nil {
-			return fmt.Errorf("error fetching sprints. err: %v", err)
-		}
-		if err := a.FetchAllIssues(proj.RefID, updated, issueChannel, issueCommentChannel); err != nil {
-			return fmt.Errorf("error fetching issues. err: %v", err)
-		}
-		state.Set("updated_"+proj.RefID, time.Now().Format(time.RFC3339Nano))
-	}
-	async := sdk.NewAsync(2)
-	async.Do(func() error {
-		for _, urs := range workUsermap {
-			if err := pipe.Write(urs); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	async.Do(func() error {
-		for _, urs := range sourcecodeUsermap {
-			if err := pipe.Write(urs); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	err = async.Wait()
-	if err == nil {
-		sdk.LogInfo(g.logger, "export finished")
-	}
-	return err
-}
-
-func (g *AzureIntegration) sendCapabilities(pipe sdk.Pipe, customerID, integrationID, projid string) {
-	pipe.Write(&sdk.WorkProjectCapability{
-		Attachments:           false,
-		ChangeLogs:            true,
-		CustomerID:            customerID,
-		DueDates:              true,
-		Epics:                 false,
-		InProgressStates:      true,
-		IntegrationInstanceID: &integrationID,
-		KanbanBoards:          false,
-		LinkedIssues:          false,
-		Parents:               false,
-		Priorities:            true,
-		ProjectID:             sdk.NewWorkProjectID(customerID, projid, g.refType),
-		RefID:                 projid,
-		RefType:               g.refType,
-		Resolutions:           true,
-		Sprints:               true,
-		StoryPoints:           true,
-	})
-}
-
-func (g *AzureIntegration) Validate(config sdk.Validate) (result map[string]interface{}, err error) {
-	return nil, nil
 }
