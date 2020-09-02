@@ -2,7 +2,6 @@ package internal
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -43,16 +42,15 @@ func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
 	if !ok {
 		concurr = 10
 	}
-	auth := config.APIKeyAuth
-	if auth == nil {
-		return errors.New("Missing --apikey_auth")
+	url, creds, err := g.getHTTPCredOpts(config)
+	if err != nil {
+		return err
 	}
-	basicAuth := sdk.WithBasicAuth("", auth.APIKey)
-	client := g.manager.HTTPManager().New(auth.URL, nil)
+	client := g.manager.HTTPManager().New(url, nil)
 	customerID := webhook.CustomerID()
 	rawPayload := webhook.Bytes()
 
-	a := api.New(g.logger, client, webhook.State(), customerID, integrationID, g.refType, concurr, basicAuth)
+	a := api.New(g.logger, client, webhook.State(), customerID, integrationID, g.refType, concurr, creds)
 
 	if strings.HasPrefix(payload.EventType, "workitem.") {
 		return g.handleWorkWebHooks(customerID, webhook.IntegrationInstanceID(), payload.EventType, rawPayload, pipe, a)
@@ -175,10 +173,14 @@ func (g *AzureIntegration) unregisterWebHooks(instance sdk.Instance, concurr int
 	customerID := instance.CustomerID()
 	integrationID := instance.IntegrationInstanceID()
 	state := instance.State()
-	auth := instance.Config().APIKeyAuth
 
-	client := g.manager.HTTPManager().New(auth.URL, nil)
-	a := api.New(g.logger, client, instance.State(), customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+	url, creds, err := g.getHTTPCredOpts(instance.Config())
+	if err != nil {
+		return err
+	}
+
+	client := g.manager.HTTPManager().New(url, nil)
+	a := api.New(g.logger, client, instance.State(), customerID, integrationID, g.refType, concurr, creds)
 
 	// fetch projects
 	projects, err := a.FetchProjects()
