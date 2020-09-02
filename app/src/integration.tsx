@@ -98,7 +98,6 @@ const Integration = () => {
 	const [, setRerender] = useState(0);
 	const [accounts, setAccounts] = useState<Account[]>([]);
 
-	console.log("======= render =======")
 	// ============= OAuth 2.0 =============
 	useEffect(() => {
 		if (!loading && isFromRedirect && currentURL) {

@@ -136,8 +136,13 @@ func (g *AzureIntegration) Validate(validate sdk.Validate) (result map[string]in
 	if err != nil {
 		return nil, err
 	}
+	var accts []*sdk.ConfigAccount
+	for _, each := range *conf.Accounts {
+		accts = append(accts, each)
+	}
+
 	return map[string]interface{}{
-		"accounts": conf.Accounts,
+		"accounts": accts,
 	}, nil
 
 }
