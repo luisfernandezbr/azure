@@ -111,7 +111,6 @@ const Integration = () => {
 		}
 		if ((config.apikey_auth != null || config.oauth2_auth != null) && accounts.length == 0 && !fetching) {
 			setFetching(true);
-			console.log("====== accounts", accounts)
 			const fetch = async () => {
 				setLoading(true);
 				let data: validationResponse;
