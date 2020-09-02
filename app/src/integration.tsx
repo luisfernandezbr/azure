@@ -13,6 +13,7 @@ import {
 	FormType,
 	ConfigAccount,
 	APIKeyAuth,
+	Config,
 } from '@pinpt/agent.websdk';
 
 import styles from './styles.module.less';
@@ -33,20 +34,8 @@ interface validationResponse {
 	accounts: ConfigAccount[];
 }
 
-const AccountList = ({ accounts, setAccounts }: { accounts: Account[], setAccounts: (val: Account[]) => void }) => {
+const AccountList = ({ accounts, config }: { accounts: Account[], config: Config }) => {
 
-	const { config, setValidate } = useIntegration();
-
-	useEffect(() => {
-		if (accounts == null) {
-			const fetch = async () => {
-				let data: validationResponse;
-				data = await setValidate(config);
-				setAccounts(data.accounts.map((acct) => toAccount(acct)));
-			};
-			fetch();
-		}
-	}, []);
 
 	return (
 		<AccountsTable
@@ -74,15 +63,12 @@ const LocationSelector = ({ setType }: { setType: (val: IntegrationType) => void
 	);
 };
 
-const SelfManagedForm = ({ setAccounts }: { setAccounts: (val: Account[]) => void }) => {
-	const { setValidate, config, setConfig } = useIntegration();
+const SelfManagedForm = () => {
+	const { config, setConfig } = useIntegration();
 	async function verify(auth: IAuth) {
 		try {
-			let data: validationResponse;
 			config.apikey_auth = auth as APIKeyAuth
-			data = await setValidate(config);
 			setConfig(config)
-			setAccounts(data.accounts.map((acct) => toAccount(acct)));
 		} catch (err) {
 			throw new Error(err.message);
 		}
@@ -91,14 +77,18 @@ const SelfManagedForm = ({ setAccounts }: { setAccounts: (val: Account[]) => voi
 };
 
 const Integration = () => {
-	const { installed, setInstallEnabled, loading, currentURL, config, isFromRedirect, isFromReAuth, setConfig, setValidate } = useIntegration();
+	const { installed, setInstallEnabled, setLoading, loading, currentURL, config, isFromRedirect, isFromReAuth, setConfig, setValidate } = useIntegration();
 	const [type, setType] = useState<IntegrationType | undefined>(config.integration_type);
 	const [, setRerender] = useState(0);
 	const [accounts, setAccounts] = useState<Account[]>([]);
+	const [fetching, setFetching] = useState<Boolean>(false);
 
-	// ============= OAuth 2.0 =============
 	useEffect(() => {
-		if (!loading && isFromRedirect && currentURL) {
+		if (loading) {
+			return
+		}
+		// ============= OAuth 2.0 =============
+		if (isFromRedirect && currentURL) {
 			const search = currentURL.split('?');
 			const tok = search[1].split('&');
 			tok.forEach(async token => {
@@ -115,17 +105,30 @@ const Integration = () => {
 						scopes: profile.Integration.auth.scopes,
 					};
 					config.integration_type = IntegrationType.CLOUD
-					try {
-						await setValidate(config);
-					} catch (err) {
-						throw new Error(err.message);
-					}
 					setConfig(config);
-					setRerender(Date.now());
 				}
 			});
 		}
-	}, [loading, isFromRedirect, currentURL, config]);
+		if ((config.apikey_auth != null || config.oauth2_auth != null) && accounts.length == 0 && !fetching) {
+			setFetching(true);
+			console.log("====== accounts", accounts)
+			const fetch = async () => {
+				setLoading(true);
+				let data: validationResponse;
+				try {
+					data = await setValidate(config);
+				} catch (err) {
+					throw new Error(err.message);
+				}
+				setAccounts(data.accounts.map((acct) => toAccount(acct)));
+				setLoading(false);
+				setFetching(false);
+			}
+			fetch()
+			return
+		}
+
+	}, [loading, isFromRedirect, currentURL, config, fetching]);
 
 	useEffect(() => {
 		if (type) {
@@ -152,7 +155,7 @@ const Integration = () => {
 		if (config.integration_type === IntegrationType.CLOUD) {
 			content = <OAuthConnect name='Azure DevOps' reauth />
 		} else {
-			content = <SelfManagedForm setAccounts={setAccounts} />;
+			content = <SelfManagedForm />;
 		}
 	} else {
 		if (!config.integration_type) {
@@ -160,9 +163,9 @@ const Integration = () => {
 		} else if (config.integration_type === IntegrationType.CLOUD && !config.oauth2_auth) {
 			content = <OAuthConnect name='Azure DevOps' />;
 		} else if (config.integration_type === IntegrationType.SELFMANAGED && !config.apikey_auth && !config.apikey_auth) {
-			content = <SelfManagedForm setAccounts={setAccounts} />;
+			content = <SelfManagedForm />;
 		} else {
-			content = <AccountList accounts={accounts} setAccounts={setAccounts} />
+			content = <AccountList accounts={accounts} config={config} />
 		}
 	}
 
