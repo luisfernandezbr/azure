@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Icon, Loader } from '@pinpt/uic.next';
+import { Icon, Loader, Error as ErrorMessage } from '@pinpt/uic.next';
 import {
 	useIntegration,
 	Account,
@@ -12,120 +12,42 @@ import {
 	FormType,
 	Http,
 	IOAuth2Auth,
+	ConfigAccount,
+	Config,
 } from '@pinpt/agent.websdk';
 
 import styles from './styles.module.less';
 
-interface project {
-	id: string;
-	name: string;
-	description: string;
-	visibility: string;
-}
-
-interface repo {
-	id: string;
-	name: string;
-}
-
-async function fetchProjects(auth: IAuth): Promise<project[]> {
-	try {
-		let url = auth.url + '/_apis/projects?api-version=5.1';
-		let res = await Http.get(url, { 'Authorization': createAuthHeader(auth) });
-		if (res[1] === 200) {
-			return res[0].value;
-		}
-		throw new Error('error fetching projects, status code' + res[1]);
-	} catch (err) {
-		throw new Error('error fetching projects, check url and api key');
+const toAccount = (data: ConfigAccount): Account => {
+	return {
+		id: data.id,
+		public: data.public,
+		type: data.type,
+		avatarUrl: data.avatarUrl,
+		name: data.name || '',
+		description: data.description || '',
+		totalCount: data.totalCount || 0,
 	}
-}
-async function fetchRepos(projid: string, auth: IAuth): Promise<repo[]> {
-	try {
-		let url = auth.url + '/' + projid + '/_apis/git/repositories?api-version=5.1';
-		let res = await Http.get(url, { 'Authorization': createAuthHeader(auth) });
-		if (res[1] === 200) {
-			return res[0].value;
-		}
-		throw new Error('error fetching repos, status code' + res[1]);
-	} catch (err) {
-		throw new Error('error fetching repos ' + err.message);
-	}
-}
-function createAuthHeader(auth: IAuth): string {
-	if ('apikey' in auth) {
-		let a = (auth as IAPIKeyAuth);
-		return 'Basic ' + btoa(':' + a.apikey);
-	}
-	let a = (auth as IOAuth2Auth);
-	return 'Bearer ' + a.access_token;
+};
+
+interface validationResponse {
+	accounts: ConfigAccount[];
 }
 
-const AccountList = ({ projects, setProjects }: { projects: project[], setProjects: (val: project[]) => void }) => {
+const AccountList = ({ accounts, setAccounts }: { accounts: Account[], setAccounts: (val: Account[]) => void }) => {
 
-	const { config, setConfig, installed, setInstallEnabled } = useIntegration();
-	const [fetching, setFetching] = useState(false);
-	const [accounts, setAccounts] = useState<Account[]>([]);
-
-	let auth: IAuth
-	if (config.apikey_auth) {
-		auth = config.apikey_auth as IAPIKeyAuth;
-	} else {
-		auth = config.oauth2_auth as IOAuth2Auth;
-	}
+	const { config, setConfig, installed, setInstallEnabled, setValidate, processingDetail } = useIntegration();
 
 	useEffect(() => {
-		if (fetching || accounts.length || !projects.length) {
-			return;
+		if (accounts == null) {
+			const fetch = async () => {
+				let data: validationResponse;
+				data = await setValidate(config);
+				setAccounts(data.accounts.map((acct) => toAccount(acct)));
+			};
+			fetch();
 		}
-		setFetching(true);
-		const fetch = async () => {
-			config.accounts = {};
-			for (var i = 0; i < projects.length; i++) {
-				let proj = projects[i];
-				let res: repo[];
-				try {
-					res = await fetchRepos(proj.id, auth!);
-				} catch (err) {
-					console.error(err);
-					return;
-				}
-				let acc: Account = {
-					id: proj.id,
-					name: proj.name,
-					description: proj.description,
-					avatarUrl: '',
-					totalCount: res.length,
-					type: 'ORG',
-					public: proj.visibility === 'public',
-				};
-				accounts.push(acc);
-				config.accounts[proj.id] = acc;
-			}
-			setConfig(config);
-			setAccounts(accounts);
-			if (!installed && accounts.length > 0) {
-				setInstallEnabled(true);
-			}
-			setFetching(false);
-		}
-		fetch();
-	}, [projects]);
-
-	useEffect(() => {
-		if (projects.length) {
-			return
-		}
-		const fetch = async () => {
-			try {
-				var res = await fetchProjects(auth!);
-				setProjects(res);
-			} catch (err) {
-				console.error('error fetching projects. responde code', err);
-			}
-		}
-		fetch();
-	}, [config.apikey_auth, config.oauth2_auth]);
+	}, []);
 
 	return (
 		<AccountsTable
@@ -153,24 +75,27 @@ const LocationSelector = ({ setType }: { setType: (val: IntegrationType) => void
 	);
 };
 
-const SelfManagedForm = ({ setProjects }: { setProjects: (val: project[]) => void }) => {
+const SelfManagedForm = ({ setAccounts }: { setAccounts: (val: Account[]) => void }) => {
+	const { setValidate, config } = useIntegration();
 	async function verify(auth: IAuth) {
 		try {
-			var res = await fetchProjects(auth!);
-			setProjects(res);
+			let data: validationResponse;
+			data = await setValidate(config);
+			setAccounts(data.accounts.map((acct) => toAccount(acct)));
 		} catch (err) {
-			throw new Error(err.message)
+			throw new Error(err.message);
 		}
 	}
 	return <Form type={FormType.API} name='AzureDevOps' callback={verify} />;
 };
 
 const Integration = () => {
-	const { loading, currentURL, config, isFromRedirect, isFromReAuth, setConfig } = useIntegration();
+	const { installed, setInstallEnabled, loading, currentURL, config, isFromRedirect, isFromReAuth, setConfig, setValidate } = useIntegration();
 	const [type, setType] = useState<IntegrationType | undefined>(config.integration_type);
 	const [, setRerender] = useState(0);
-	const [projects, setProjects] = useState<project[]>([]);
+	const [accounts, setAccounts] = useState<Account[]>([]);
 
+	console.log("======= render =======")
 	// ============= OAuth 2.0 =============
 	useEffect(() => {
 		if (!loading && isFromRedirect && currentURL) {
@@ -189,12 +114,18 @@ const Integration = () => {
 						refresh_token: profile.Integration.auth.refreshToken,
 						scopes: profile.Integration.auth.scopes,
 					};
+					config.integration_type = IntegrationType.CLOUD
+					try {
+						await setValidate(config);
+					} catch (err) {
+						throw new Error(err.message);
+					}
 					setConfig(config);
 					setRerender(Date.now());
 				}
 			});
 		}
-	}, [loading, isFromRedirect, currentURL]);
+	}, [loading, isFromRedirect, currentURL, config]);
 
 	useEffect(() => {
 		if (type) {
@@ -203,6 +134,13 @@ const Integration = () => {
 			setRerender(Date.now());
 		}
 	}, [type]);
+
+	useEffect(() => {
+		config.accounts = config.accounts || {};
+		setInstallEnabled(installed ? true : Object.keys(config.accounts).length > 0);
+		setConfig(config);
+		setRerender(Date.now());
+	}, [accounts]);
 
 	if (loading) {
 		return <Loader screen />;
@@ -214,17 +152,17 @@ const Integration = () => {
 		if (config.integration_type === IntegrationType.CLOUD) {
 			content = <OAuthConnect name='Azure DevOps' reauth />
 		} else {
-			content = <SelfManagedForm setProjects={setProjects} />;
+			content = <SelfManagedForm setAccounts={setAccounts} />;
 		}
 	} else {
 		if (!config.integration_type) {
 			content = <LocationSelector setType={setType} />;
 		} else if (config.integration_type === IntegrationType.CLOUD && !config.oauth2_auth) {
 			content = <OAuthConnect name='Azure DevOps' />;
-		} else if (config.integration_type === IntegrationType.SELFMANAGED && !config.basic_auth && !config.apikey_auth) {
-			content = <SelfManagedForm setProjects={setProjects} />;
+		} else if (config.integration_type === IntegrationType.SELFMANAGED && !config.apikey_auth && !config.apikey_auth) {
+			content = <SelfManagedForm setAccounts={setAccounts} />;
 		} else {
-			content = <AccountList projects={projects} setProjects={setProjects} />
+			content = <AccountList accounts={accounts} setAccounts={setAccounts} />
 		}
 	}
 
