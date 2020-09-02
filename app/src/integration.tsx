@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Icon, Loader, Error as ErrorMessage } from '@pinpt/uic.next';
+import { Loader, Error as ErrorMessage } from '@pinpt/uic.next';
+import Icon from '@pinpt/uic.next/Icon'
+import { faCloud, faServer } from '@fortawesome/free-solid-svg-icons';
 import {
 	useIntegration,
 	Account,
@@ -60,12 +62,12 @@ const LocationSelector = ({ setType }: { setType: (val: IntegrationType) => void
 	return (
 		<div className={styles.Location}>
 			<div className={styles.Button} onClick={() => setType(IntegrationType.CLOUD)}>
-				<Icon icon={['fas', 'cloud']} className={styles.Icon} />
+				<Icon icon={faCloud} className={styles.Icon} />
 				I'm using the <strong>dev.azure.com</strong> cloud service to manage my data
 			</div>
 
 			<div className={styles.Button} onClick={() => setType(IntegrationType.SELFMANAGED)}>
-				<Icon icon={['fas', 'server']} className={styles.Icon} />
+				<Icon icon={faServer} className={styles.Icon} />
 				I'm using <strong>my own systems</strong> or a <strong>third-party</strong> to manage a Azure DevOps service
 			</div>
 		</div>
