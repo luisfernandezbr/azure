@@ -81,7 +81,7 @@ func (g *AzureIntegration) fetchAccounts(customerID, integrationID string, confi
 		concurr = 10
 	}
 	client := g.manager.HTTPManager().New(url, nil)
-	a := api.New(g.logger, client, nil, customerID, integrationID, g.refType, concurr, creds)
+	a := api.New(g.logger, client, nil, nil, customerID, integrationID, g.refType, concurr, creds)
 	projects, err := a.FetchProjects()
 	if err != nil {
 		return nil, err
@@ -116,7 +116,6 @@ func (g *AzureIntegration) AutoConfigure(autoconfig sdk.AutoConfigure) (*sdk.Con
 	customerID := autoconfig.CustomerID()
 	integrationID := autoconfig.IntegrationInstanceID()
 	config := autoconfig.Config()
-
 	return g.fetchAccounts(customerID, integrationID, config)
 }
 
