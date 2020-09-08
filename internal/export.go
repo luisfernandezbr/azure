@@ -30,65 +30,12 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 		concurr = 10
 	}
 
-	prsChannel := make(chan *sdk.SourceCodePullRequest, concurr)
-	go func() {
-		for each := range prsChannel {
-			pipe.Write(each)
-		}
-	}()
-	prCommitsChannel := make(chan *sdk.SourceCodePullRequestCommit, concurr)
-	go func() {
-		for each := range prCommitsChannel {
-			pipe.Write(each)
-		}
-	}()
-	prCommentsChannel := make(chan *sdk.SourceCodePullRequestComment, concurr)
-	go func() {
-		for each := range prCommentsChannel {
-			pipe.Write(each)
-		}
-	}()
-	prReviewsChannel := make(chan *sdk.SourceCodePullRequestReview, concurr)
-	go func() {
-		for each := range prReviewsChannel {
-			pipe.Write(each)
-		}
-	}()
-
-	issueChannel := make(chan *sdk.WorkIssue, concurr)
-	go func() {
-		for each := range issueChannel {
-			pipe.Write(each)
-		}
-	}()
-	issueCommentChannel := make(chan *sdk.WorkIssueComment, concurr)
-	go func() {
-		for each := range issueCommentChannel {
-			pipe.Write(each)
-		}
-	}()
-	sprintChannel := make(chan *sdk.AgileSprint, concurr)
-	go func() {
-		for each := range sprintChannel {
-			pipe.Write(each)
-		}
-	}()
-
-	statusesChannel := make(chan *sdk.WorkIssueStatus, concurr)
-	go func() {
-		for each := range statusesChannel {
-			pipe.Write(each)
-		}
-	}()
-
 	workUsermap := map[string]*sdk.WorkUser{}
 	sourcecodeUsermap := map[string]*sdk.SourceCodeUser{}
-	a := api.New(g.logger, client, state, customerID, integrationID, g.refType, concurr, creds)
-	workconf, err := a.FetchStatuses(statusesChannel)
-	if err != nil {
+	a := api.New(g.logger, client, state, pipe, customerID, integrationID, g.refType, concurr, creds)
+	if err := a.FetchStatuses(); err != nil {
 		return err
 	}
-	pipe.Write(workconf)
 
 	projects, err := a.FetchProjects()
 	if err != nil {
@@ -111,7 +58,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 		}
 		for _, r := range repos {
 			pipe.Write(r)
-			if err := a.FetchPullRequests(proj.RefID, r.RefID, r.Name, updated, prsChannel, prCommitsChannel, prCommentsChannel, prReviewsChannel); err != nil {
+			if err := a.FetchPullRequests(proj.RefID, r.RefID, r.Name, updated); err != nil {
 				return fmt.Errorf("error fetching pull requests repos. err: %v", err)
 			}
 		}
@@ -123,10 +70,10 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 		if err := a.FetchUsers(proj.RefID, ids, workUsermap, sourcecodeUsermap); err != nil {
 			return fmt.Errorf("error fetching users. err: %v", err)
 		}
-		if err := a.FetchSprints(proj.RefID, ids, sprintChannel); err != nil {
+		if err := a.FetchSprints(proj.RefID, ids); err != nil {
 			return fmt.Errorf("error fetching sprints. err: %v", err)
 		}
-		if err := a.FetchAllIssues(proj.RefID, updated, issueChannel, issueCommentChannel); err != nil {
+		if err := a.FetchAllIssues(proj.RefID, updated); err != nil {
 			return fmt.Errorf("error fetching issues. err: %v", err)
 		}
 		state.Set("updated_"+proj.RefID, time.Now().Format(time.RFC3339Nano))

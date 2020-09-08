@@ -7,7 +7,7 @@ import (
 	"github.com/pinpt/agent.next/sdk"
 )
 
-func (a *API) sendPullRequestCommit(projid string, repoRefID string, p pullRequestResponseWithShas, prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit) error {
+func (a *API) sendPullRequestCommit(projid string, repoRefID string, p pullRequestResponseWithShas) error {
 	sha := p.commitSHAs[len(p.commitSHAs)-1]
 	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/commits/%s`, url.PathEscape(p.Repository.ID), url.PathEscape(sha))
 	var out singleCommitResponse
@@ -19,6 +19,7 @@ func (a *API) sendPullRequestCommit(projid string, repoRefID string, p pullReque
 	}
 	prrefid := a.createPullRequestID(projid, repoRefID, p.PullRequestID)
 	commit := &sdk.SourceCodePullRequestCommit{
+		Active:                true,
 		Additions:             out.ChangeCounts.Add,
 		AuthorRefID:           out.Push.PushedBy.ID,
 		BranchID:              sdk.NewSourceCodeBranchID(a.customerID, repoRefID, a.refType, p.SourceBranch, p.commitSHAs[0]),
@@ -35,11 +36,10 @@ func (a *API) sendPullRequestCommit(projid string, repoRefID string, p pullReque
 		URL:                   out.RemoteURL,
 	}
 	sdk.ConvertTimeToDateModel(out.Push.Date, &commit.CreatedDate)
-	prCommitsChannel <- commit
-	return nil
+	return a.pipe.Write(commit)
 }
 
-func (a *API) sendPullRequestCommits(projid string, reponame string, pr pullRequestResponseWithShas, prsChannel chan<- *sdk.SourceCodePullRequest, prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit) error {
+func (a *API) sendPullRequestCommits(projid string, reponame string, pr pullRequestResponseWithShas) error {
 	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/pullRequests/%d/commits`, url.PathEscape(pr.Repository.ID), pr.PullRequestID)
 	var out struct {
 		Value []commitsResponseLight `json:"value"`
@@ -53,11 +53,11 @@ func (a *API) sendPullRequestCommits(projid string, reponame string, pr pullRequ
 		for _, commit := range out.Value {
 			pr.commitSHAs = append(pr.commitSHAs, commit.CommitID)
 			pr := pr
-			if err := a.sendPullRequestCommit(projid, pr.Repository.ID, pr, prCommitsChannel); err != nil {
+			if err := a.sendPullRequestCommit(projid, pr.Repository.ID, pr); err != nil {
 				return err
 			}
 		}
-		a.sendPullRequest(projid, reponame, pr.Repository.ID, pr, prsChannel)
+		return a.sendPullRequest(projid, reponame, pr.Repository.ID, pr)
 	}
 
 	return nil

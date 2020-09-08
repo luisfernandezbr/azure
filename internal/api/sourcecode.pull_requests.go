@@ -9,15 +9,8 @@ import (
 	"github.com/pinpt/agent.next/sdk"
 )
 
-// FetchPullRequests calls the pull request api and processes the reponse sending each object to the corresponding channel async
-// sdk.SourceCodePullRequest, sdk.SourceCodePullRequestReview, sdk.SourceCodePullRequestComment, and sdk.SourceCodePullRequestCommit
-func (a *API) FetchPullRequests(
-	projid string, repoid string, reponame string, updated time.Time,
-	prsChannel chan<- *sdk.SourceCodePullRequest,
-	prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit,
-	prCommentsChannel chan<- *sdk.SourceCodePullRequestComment,
-	prReviewsChannel chan<- *sdk.SourceCodePullRequestReview,
-) error {
+// FetchPullRequests calls the pull request api and processes the reponse writing each object to the pipeline
+func (a *API) FetchPullRequests(projid string, repoid string, reponame string, updated time.Time) error {
 	sdk.LogInfo(a.logger, "fetching pull requests", "project_id", projid, "repo_id", repoid)
 
 	endpoint := fmt.Sprintf(`%s/_apis/git/repositories/%s/pullrequests`, url.PathEscape(projid), url.PathEscape(repoid))
@@ -34,7 +27,7 @@ func (a *API) FetchPullRequests(
 			if err := object.Unmarshal(&value); err != nil {
 				errochan <- err
 			}
-			err := a.processPullRequests(value, projid, repoid, reponame, updated, prsChannel, prCommitsChannel, prCommentsChannel, prReviewsChannel)
+			err := a.processPullRequests(value, projid, repoid, reponame, updated)
 			if err != nil {
 				errochan <- err
 				return
@@ -74,13 +67,7 @@ func (a *API) UpdatePullRequest(refid string, v *sdk.SourcecodePullRequestUpdate
 	return nil
 }
 
-func (a *API) processPullRequests(value []pullRequestResponse,
-	projid string, repoid string, reponame string, updated time.Time,
-	prsChannel chan<- *sdk.SourceCodePullRequest,
-	prCommitsChannel chan<- *sdk.SourceCodePullRequestCommit,
-	prCommentsChannel chan<- *sdk.SourceCodePullRequestComment,
-	prReviewsChannel chan<- *sdk.SourceCodePullRequestReview,
-) error {
+func (a *API) processPullRequests(value []pullRequestResponse, projid string, repoid string, reponame string, updated time.Time) error {
 
 	historical := updated.IsZero()
 	var pullrequests []pullRequestResponse
@@ -110,7 +97,7 @@ func (a *API) processPullRequests(value []pullRequestResponse,
 		async.Do(func() error {
 			pr.SourceBranch = strings.TrimPrefix(p.SourceBranch, "refs/heads/")
 			pr.TargetBranch = strings.TrimPrefix(p.TargetBranch, "refs/heads/")
-			if err := a.sendPullRequestCommits(projid, reponame, pr, prsChannel, prCommitsChannel); err != nil {
+			if err := a.sendPullRequestCommits(projid, reponame, pr); err != nil {
 				return fmt.Errorf("error fetching commits for PR, skipping pr_id:%v repo_id:%v err:%v", pr.PullRequestID, pr.Repository.ID, err)
 			}
 			return nil
@@ -125,15 +112,16 @@ func (a *API) processPullRequests(value []pullRequestResponse,
 	for _, p := range pullrequestcomments {
 		pr := p
 		async.Do(func() error {
-			return a.sendPullRequestComment(projid, repoid, pr, prCommentsChannel, prReviewsChannel)
+			return a.sendPullRequestComment(projid, repoid, pr)
 		})
 	}
 	return async.Wait()
 }
 
-func (a *API) sendPullRequest(projid string, reponame string, repoRefID string, p pullRequestResponseWithShas, prsChannel chan<- *sdk.SourceCodePullRequest) {
+func (a *API) sendPullRequest(projid string, reponame string, repoRefID string, p pullRequestResponseWithShas) error {
 	prrefid := a.createPullRequestID(projid, repoRefID, p.PullRequestID)
 	pr := &sdk.SourceCodePullRequest{
+		Active:                true,
 		BranchName:            p.SourceBranch,
 		CreatedByRefID:        p.CreatedBy.ID,
 		CustomerID:            a.customerID,
@@ -183,6 +171,5 @@ func (a *API) sendPullRequest(projid string, reponame string, repoRefID string, 
 	for _, lbl := range p.Labels {
 		pr.Labels = append(pr.Labels, lbl.Name)
 	}
-
-	prsChannel <- pr
+	return a.pipe.Write(pr)
 }
