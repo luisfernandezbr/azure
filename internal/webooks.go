@@ -50,7 +50,7 @@ func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
 	customerID := webhook.CustomerID()
 	rawPayload := webhook.Bytes()
 
-	a := api.New(g.logger, client, webhook.State(), customerID, integrationID, g.refType, concurr, creds)
+	a := api.New(g.logger, client, webhook.State(), webhook.Pipe(), customerID, integrationID, g.refType, concurr, creds)
 
 	if strings.HasPrefix(payload.EventType, "workitem.") {
 		return g.handleWorkWebHooks(customerID, webhook.IntegrationInstanceID(), payload.EventType, rawPayload, pipe, a)
@@ -77,26 +77,6 @@ func (g *AzureIntegration) handleWorkWebHooks(customerID, intID, eventType strin
 		return pipe.Write(obj)
 	}
 
-	errorchan := make(chan error)
-	issueChannel := make(chan *sdk.WorkIssue)
-	go func() {
-		for each := range issueChannel {
-			if err := pipe.Write(each); err != nil {
-				errorchan <- err
-				return
-			}
-		}
-	}()
-	issueCommentChannel := make(chan *sdk.WorkIssueComment)
-	go func() {
-		for each := range issueCommentChannel {
-			if err := pipe.Write(each); err != nil {
-				errorchan <- err
-				return
-			}
-		}
-	}()
-
 	var itemID string
 	if eventType == "workitem.created" {
 		itemID = fmt.Sprint(data.Resource.ID)
@@ -104,14 +84,7 @@ func (g *AzureIntegration) handleWorkWebHooks(customerID, intID, eventType strin
 		itemID = fmt.Sprint(data.Resource.WorkItemID)
 	}
 	projectID := data.ResourceContainers.Project.ID
-	go func() {
-		if err := a.FetchIssues(projectID, []string{itemID}, issueChannel, issueCommentChannel); err != nil {
-			errorchan <- err
-			return
-		}
-		errorchan <- nil
-	}()
-	return <-errorchan
+	return a.FetchIssues(projectID, []string{itemID})
 }
 
 func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64) error {
@@ -119,10 +92,11 @@ func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64
 	customerID := instance.CustomerID()
 	integrationID := instance.IntegrationInstanceID()
 	state := instance.State()
+	pipe := instance.Pipe()
 	auth := instance.Config().APIKeyAuth
 
 	client := g.manager.HTTPManager().New(auth.URL, nil)
-	a := api.New(g.logger, client, instance.State(), customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+	a := api.New(g.logger, client, state, pipe, customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
 
 	// fetch projects
 	projects, err := a.FetchProjects()
@@ -173,6 +147,7 @@ func (g *AzureIntegration) unregisterWebHooks(instance sdk.Instance, concurr int
 	customerID := instance.CustomerID()
 	integrationID := instance.IntegrationInstanceID()
 	state := instance.State()
+	pipe := instance.Pipe()
 
 	url, creds, err := g.getHTTPCredOpts(instance.Config())
 	if err != nil {
@@ -180,7 +155,7 @@ func (g *AzureIntegration) unregisterWebHooks(instance sdk.Instance, concurr int
 	}
 
 	client := g.manager.HTTPManager().New(url, nil)
-	a := api.New(g.logger, client, instance.State(), customerID, integrationID, g.refType, concurr, creds)
+	a := api.New(g.logger, client, state, pipe, customerID, integrationID, g.refType, concurr, creds)
 
 	// fetch projects
 	projects, err := a.FetchProjects()
