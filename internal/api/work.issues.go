@@ -13,7 +13,7 @@ import (
 const whereDateFormat = `01/02/2006 15:04:05Z`
 
 // FetchStatuses gets issues from project id
-func (a *API) FetchStatuses() error {
+func (a *API) FetchStatuses(issueStatusChannel chan<- *sdk.WorkIssueStatus) (*sdk.WorkConfig, error) {
 
 	mu := sync.Mutex{}
 
@@ -23,7 +23,7 @@ func (a *API) FetchStatuses() error {
 		Value []processesResponse `json:"value"`
 	}
 	if _, err := a.get("_apis/work/processes", params, &out); err != nil {
-		return err
+		return nil, err
 	}
 	statuses := sdk.WorkConfigStatuses{}
 	async := sdk.NewAsync(a.concurrency / 2)
@@ -69,15 +69,13 @@ func (a *API) FetchStatuses() error {
 					}
 
 					for _, state := range out.Value {
-						if err := a.pipe.Write(&sdk.WorkIssueStatus{
+						issueStatusChannel <- &sdk.WorkIssueStatus{
 							CustomerID:            a.customerID,
 							Description:           state.StateCategory,
 							IntegrationInstanceID: &a.integrationID,
 							Name:                  state.Name,
 							RefID:                 state.ID,
 							RefType:               a.refType,
-						}); err != nil {
-							return err
 						}
 
 						mu.Lock()
@@ -101,20 +99,18 @@ func (a *API) FetchStatuses() error {
 			return async2.Wait()
 		})
 	}
-	if err := async.Wait(); err != nil {
-		return err
-	}
-	err := a.pipe.Write(&sdk.WorkConfig{
+	err := async.Wait()
+	workconf := &sdk.WorkConfig{
 		CustomerID:            a.customerID,
 		IntegrationInstanceID: a.integrationID,
 		RefType:               a.refType,
 		Statuses:              statuses,
-	})
-	return err
+	}
+	return workconf, err
 }
 
 // FetchAllIssues gets issues from project id
-func (a *API) FetchAllIssues(projid string, updated time.Time) error {
+func (a *API) FetchAllIssues(projid string, updated time.Time, issueChannel chan<- *sdk.WorkIssue, issueCommentChannel chan<- *sdk.WorkIssueComment) error {
 
 	sdk.LogInfo(a.logger, "fetching issues for project", "project_id", projid)
 
@@ -136,7 +132,7 @@ func (a *API) FetchAllIssues(projid string, updated time.Time) error {
 	var items []string
 	for i, item := range out.WorkItems {
 		if i != 0 && (i%200) == 0 {
-			err := a.FetchIssues(projid, items)
+			err := a.FetchIssues(projid, items, issueChannel, issueCommentChannel)
 			if err != nil {
 				return err
 			}
@@ -144,7 +140,7 @@ func (a *API) FetchAllIssues(projid string, updated time.Time) error {
 		}
 		items = append(items, fmt.Sprint(item.ID))
 	}
-	err := a.FetchIssues(projid, items)
+	err := a.FetchIssues(projid, items, issueChannel, issueCommentChannel)
 	if err != nil {
 		return err
 	}
@@ -152,7 +148,7 @@ func (a *API) FetchAllIssues(projid string, updated time.Time) error {
 }
 
 // FetchIssues gets all the issues from the ids array
-func (a *API) FetchIssues(projid string, ids []string) error {
+func (a *API) FetchIssues(projid string, ids []string, issueChannel chan<- *sdk.WorkIssue, issueCommentChannel chan<- *sdk.WorkIssueComment) error {
 
 	processid := projectProcessMap[projid]
 	process := a.statusesMap[processid]
@@ -209,7 +205,6 @@ func (a *API) FetchIssues(projid string, ids []string) error {
 
 			storypoints := fields.StoryPoints
 			issue := &sdk.WorkIssue{
-				Active:                true,
 				AssigneeRefID:         fields.AssignedTo.ID,
 				CreatorRefID:          fields.CreatedBy.ID,
 				CustomerID:            a.customerID,
@@ -243,10 +238,11 @@ func (a *API) FetchIssues(projid string, ids []string) error {
 				updatedDate = fields.ChangedDate
 			}
 			sdk.ConvertTimeToDateModel(updatedDate, &issue.UpdatedDate)
-			return a.pipe.Write(issue)
+			issueChannel <- issue
+			return nil
 		})
 		async.Do(func() error {
-			return a.fetchComments(projid, item.ID)
+			return a.fetchComments(projid, item.ID, issueCommentChannel)
 		})
 	}
 

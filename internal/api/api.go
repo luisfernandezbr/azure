@@ -22,17 +22,15 @@ type API struct {
 	logger        sdk.Logger
 	creds         sdk.WithHTTPOption
 	state         sdk.State
-	pipe          sdk.Pipe
 	// process_id - type_name - state_name
 	statusesMap map[string]map[string]map[string]string
 }
 
 // New creates a new instance of the api object
-func New(logger sdk.Logger, client sdk.HTTPClient, state sdk.State, pipe sdk.Pipe, customerID, integrationID, refType string, concurrency int64, creds sdk.WithHTTPOption) *API {
+func New(logger sdk.Logger, client sdk.HTTPClient, state sdk.State, customerID, integrationID, refType string, concurrency int64, creds sdk.WithHTTPOption) *API {
 	return &API{
 		client:        client,
 		state:         state,
-		pipe:          pipe,
 		concurrency:   int(concurrency),
 		logger:        logger,
 		refType:       refType,

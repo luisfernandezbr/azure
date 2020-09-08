@@ -18,7 +18,7 @@ func (g *AzureIntegration) Mutation(mut sdk.Mutation) error {
 	integrationID := mut.IntegrationInstanceID()
 	basicAuth := sdk.WithBasicAuth("", auth.APIKey)
 	client := g.manager.HTTPManager().New(auth.URL, nil)
-	a := api.New(g.logger, client, mut.State(), mut.Pipe(), customerID, integrationID, g.refType, 1, basicAuth)
+	a := api.New(g.logger, client, mut.State(), customerID, integrationID, g.refType, 1, basicAuth)
 	switch mut.Action() {
 	case sdk.CreateAction:
 		switch mu := mut.Payload().(type) {

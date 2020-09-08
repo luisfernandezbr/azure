@@ -10,7 +10,7 @@ import (
 
 var pullRequestCommentVotedReg = regexp.MustCompile(`(.+?)( voted )(-10|-5|0|5|10.*)`)
 
-func (a *API) sendPullRequestComment(projid string, repoRefID string, pr pullRequestResponse) error {
+func (a *API) sendPullRequestComment(projid string, repoRefID string, pr pullRequestResponse, prCommentsChannel chan<- *sdk.SourceCodePullRequestComment, prReviewsChannel chan<- *sdk.SourceCodePullRequestReview) error {
 
 	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/pullRequests/%d/threads`, url.PathEscape(pr.Repository.ID), pr.PullRequestID)
 	var out struct {
@@ -27,7 +27,6 @@ func (a *API) sendPullRequestComment(projid string, repoRefID string, pr pullReq
 				refid := fmt.Sprintf("%d_%d", thread.ID, comment.ID)
 
 				c := &sdk.SourceCodePullRequestComment{
-					Active:                true,
 					Body:                  comment.Content,
 					CustomerID:            a.customerID,
 					IntegrationInstanceID: &a.integrationID,
@@ -39,27 +38,7 @@ func (a *API) sendPullRequestComment(projid string, repoRefID string, pr pullReq
 				}
 				sdk.ConvertTimeToDateModel(comment.PublishedDate, &c.CreatedDate)
 				sdk.ConvertTimeToDateModel(comment.LastUpdatedDate, &c.UpdatedDate)
-				if err := a.pipe.Write(c); err != nil {
-					return err
-				}
-
-				reviewer := &sdk.SourceCodePullRequestReviewRequest{
-					Active:                 true,
-					CustomerID:             a.customerID,
-					IntegrationInstanceID:  &a.integrationID,
-					PullRequestID:          c.PullRequestID,
-					RefID:                  refid,
-					RefType:                a.refType,
-					RepoID:                 c.RepoID,
-					RequestedReviewerRefID: comment.Author.ID,
-					SenderRefID:            pr.CreatedBy.ID,
-					URL:                    pr.URL,
-				}
-				sdk.ConvertTimeToDateModel(comment.PublishedDate, &reviewer.CreatedDate)
-				if err := a.pipe.Write(reviewer); err != nil {
-					return err
-				}
-
+				prCommentsChannel <- c
 				continue
 			}
 
@@ -81,7 +60,6 @@ func (a *API) sendPullRequestComment(projid string, repoRefID string, pr pullReq
 					}
 					refid := sdk.Hash(pr.PullRequestID, thread.ID, comment.ID)
 					review := &sdk.SourceCodePullRequestReview{
-						Active:                true,
 						CustomerID:            a.customerID,
 						IntegrationInstanceID: &a.integrationID,
 						PullRequestID:         sdk.NewSourceCodePullRequestID(a.customerID, prrefid, a.refType, repoRefID),
@@ -93,9 +71,7 @@ func (a *API) sendPullRequestComment(projid string, repoRefID string, pr pullReq
 						UserRefID:             thread.Identities["1"].ID,
 					}
 					sdk.ConvertTimeToDateModel(comment.PublishedDate, &review.CreatedDate)
-					if err := a.pipe.Write(review); err != nil {
-						return err
-					}
+					prReviewsChannel <- review
 				}
 			}
 		}

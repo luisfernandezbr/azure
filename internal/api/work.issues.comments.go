@@ -7,7 +7,7 @@ import (
 	"github.com/pinpt/agent.next/sdk"
 )
 
-func (a *API) fetchComments(projid string, issueid int) error {
+func (a *API) fetchComments(projid string, issueid int, issueCommentChannel chan<- *sdk.WorkIssueComment) error {
 
 	endpoint := fmt.Sprintf("_apis/wit/workItems/%s/comments", url.PathEscape(fmt.Sprint(issueid)))
 	params := url.Values{}
@@ -25,7 +25,6 @@ func (a *API) fetchComments(projid string, issueid int) error {
 			}
 			for _, raw := range value {
 				comment := &sdk.WorkIssueComment{
-					Active:                true,
 					Body:                  raw.Text,
 					CustomerID:            a.customerID,
 					IntegrationInstanceID: &a.integrationID,
@@ -38,9 +37,7 @@ func (a *API) fetchComments(projid string, issueid int) error {
 				}
 				sdk.ConvertTimeToDateModel(raw.CreatedDate, &comment.CreatedDate)
 				sdk.ConvertTimeToDateModel(raw.ModifiedDate, &comment.UpdatedDate)
-				if err := a.pipe.Write(comment); err != nil {
-					errochan <- nil
-				}
+				issueCommentChannel <- comment
 			}
 		}
 		errochan <- nil
