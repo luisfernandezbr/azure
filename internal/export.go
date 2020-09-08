@@ -15,6 +15,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	state := export.State()
 	customerID := export.CustomerID()
 	integrationID := export.IntegrationInstanceID()
+	historical := export.Historical()
 
 	sdk.LogDebug(g.logger, "export starting")
 
@@ -49,8 +50,10 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 
 		var updated time.Time
 		var strTime string
-		if ok, _ := state.Get("updated_"+proj.RefID, &strTime); ok {
-			updated, _ = time.Parse(time.RFC3339Nano, strTime)
+		if !historical {
+			if ok, _ := state.Get("updated_"+proj.RefID, &strTime); ok {
+				updated, _ = time.Parse(time.RFC3339Nano, strTime)
+			}
 		}
 		repos, err := a.FetchRepos(proj.RefID)
 		if err != nil {
