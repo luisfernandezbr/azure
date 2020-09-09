@@ -52,23 +52,36 @@ const LocationSelector = ({ setType }: { setType: (val: IntegrationType) => void
 		<div className={styles.Location}>
 			<div className={styles.Button} onClick={() => setType(IntegrationType.CLOUD)}>
 				<Icon icon={faCloud} className={styles.Icon} />
-				I'm using the <strong>dev.azure.com</strong> cloud service to manage my data
-			</div>
+        I'm using the <strong>dev.azure.com</strong> cloud service to manage my data
+      </div>
 
 			<div className={styles.Button} onClick={() => setType(IntegrationType.SELFMANAGED)}>
 				<Icon icon={faServer} className={styles.Icon} />
-				I'm using <strong>my own systems</strong> or a <strong>third-party</strong> to manage a Azure DevOps service
-			</div>
+        I'm using <strong>my own systems</strong> or a <strong>third-party</strong> to manage a Azure DevOps service
+      </div>
 		</div>
 	);
 };
 
-const SelfManagedForm = () => {
-	const { config, setConfig } = useIntegration();
+const SelfManagedForm = ({ setLoading, setAccounts }: { setLoading: (val: boolean) => void, setAccounts: (val: Account[]) => void }) => {
+	const { config, setConfig, setValidate } = useIntegration();
 	async function verify(auth: IAuth) {
 		try {
-			config.apikey_auth = auth as APIKeyAuth
-			setConfig(config)
+			config.apikey_auth = auth as APIKeyAuth;
+			setConfig(config);
+			setLoading(true);
+			const fetch = async () => {
+				let data: validationResponse;
+				try {
+					data = await setValidate(config);
+				} catch (err) {
+					throw new Error(err.message);
+				}
+				setAccounts(data.accounts.map((acct) => toAccount(acct)));
+				setLoading(false);
+			}
+			fetch()
+
 		} catch (err) {
 			throw new Error(err.message);
 		}
@@ -109,25 +122,8 @@ const Integration = () => {
 				}
 			});
 		}
-		if ((config.apikey_auth != null || config.oauth2_auth != null) && accounts.length == 0 && !fetching) {
-			setFetching(true);
-			const fetch = async () => {
-				setLoading(true);
-				let data: validationResponse;
-				try {
-					data = await setValidate(config);
-				} catch (err) {
-					throw new Error(err.message);
-				}
-				setAccounts(data.accounts.map((acct) => toAccount(acct)));
-				setLoading(false);
-				setFetching(false);
-			}
-			fetch()
-			return
-		}
 
-	}, [loading, isFromRedirect, currentURL, config, fetching]);
+	}, [loading, isFromRedirect, currentURL, config, setConfig, fetching]);
 
 	useEffect(() => {
 		if (type) {
@@ -152,9 +148,9 @@ const Integration = () => {
 
 	if (isFromReAuth) {
 		if (config.integration_type === IntegrationType.CLOUD) {
-			content = <OAuthConnect name='Azure DevOps' reauth />
+			content = <OAuthConnect name='Azure DevOps' reauth />;
 		} else {
-			content = <SelfManagedForm />;
+			content = <SelfManagedForm setAccounts={setAccounts} setLoading={setLoading} />;
 		}
 	} else {
 		if (!config.integration_type) {
@@ -162,9 +158,9 @@ const Integration = () => {
 		} else if (config.integration_type === IntegrationType.CLOUD && !config.oauth2_auth) {
 			content = <OAuthConnect name='Azure DevOps' />;
 		} else if (config.integration_type === IntegrationType.SELFMANAGED && !config.apikey_auth && !config.apikey_auth) {
-			content = <SelfManagedForm />;
+			content = <SelfManagedForm setAccounts={setAccounts} setLoading={setLoading} />;
 		} else {
-			content = <AccountList accounts={accounts} config={config} />
+			content = <AccountList accounts={accounts} config={config} />;
 		}
 	}
 
