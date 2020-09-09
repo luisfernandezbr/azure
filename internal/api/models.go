@@ -205,7 +205,13 @@ type reposResponse struct {
 	WebURL        string          `json:"webUrl"`
 }
 
-type pullRequestResponse struct {
+// PullRequestResponse _
+type PullRequestResponse struct {
+	Links struct {
+		Web struct {
+			Href string `json:"href"`
+		} `json:"web"`
+	} `json:"_links"`
 	ClosedDate          time.Time     `json:"closedDate"`
 	CodeReviewID        int64         `json:"codeReviewId"`
 	CreatedBy           usersResponse `json:"createdBy"`
@@ -250,8 +256,8 @@ type pullRequestResponse struct {
 	} `json:"labels"`
 }
 
-type pullRequestResponseWithShas struct {
-	pullRequestResponse
+type PullRequestResponseWithShas struct {
+	PullRequestResponse
 	commitSHAs []string
 }
 
