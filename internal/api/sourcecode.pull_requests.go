@@ -23,11 +23,11 @@ func (a *API) FetchPullRequests(projid string, repoid string, reponame string, u
 	errochan := make(chan error, 1)
 	go func() {
 		for object := range out {
-			value := []PullRequestResponse{}
+			value := []pullRequestResponse{}
 			if err := object.Unmarshal(&value); err != nil {
 				errochan <- err
 			}
-			err := a.ProcessPullRequests(value, projid, repoid, reponame, updated)
+			err := a.processPullRequests(value, projid, repoid, reponame, updated)
 			if err != nil {
 				errochan <- err
 				return
@@ -67,11 +67,11 @@ func (a *API) UpdatePullRequest(refid string, v *sdk.SourcecodePullRequestUpdate
 	return nil
 }
 
-func (a *API) ProcessPullRequests(value []PullRequestResponse, projid string, repoid string, reponame string, updated time.Time) error {
+func (a *API) processPullRequests(value []pullRequestResponse, projid string, repoid string, reponame string, updated time.Time) error {
 
 	historical := updated.IsZero()
-	var pullrequests []PullRequestResponse
-	var pullrequestcomments []PullRequestResponse
+	var pullrequests []pullRequestResponse
+	var pullrequestcomments []pullRequestResponse
 
 	for _, p := range value {
 		// modify the url to show the ui instead of api call
@@ -92,8 +92,8 @@ func (a *API) ProcessPullRequests(value []PullRequestResponse, projid string, re
 	// =================== Commits ===================
 	async := sdk.NewAsync(a.concurrency)
 	for _, p := range pullrequests {
-		pr := PullRequestResponseWithShas{}
-		pr.PullRequestResponse = p
+		pr := pullRequestResponseWithShas{}
+		pr.pullRequestResponse = p
 		async.Do(func() error {
 			pr.SourceBranch = strings.TrimPrefix(p.SourceBranch, "refs/heads/")
 			pr.TargetBranch = strings.TrimPrefix(p.TargetBranch, "refs/heads/")
@@ -118,7 +118,7 @@ func (a *API) ProcessPullRequests(value []PullRequestResponse, projid string, re
 	return async.Wait()
 }
 
-func (a *API) sendPullRequest(projid string, reponame string, repoRefID string, p PullRequestResponseWithShas) error {
+func (a *API) sendPullRequest(projid string, reponame string, repoRefID string, p pullRequestResponseWithShas) error {
 	prrefid := a.createPullRequestID(projid, repoRefID, p.PullRequestID)
 	pr := &sdk.SourceCodePullRequest{
 		Active:                true,

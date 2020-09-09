@@ -10,7 +10,7 @@ import (
 
 var pullRequestCommentVotedReg = regexp.MustCompile(`(.+?)( voted )(-10|-5|0|5|10.*)`)
 
-func (a *API) sendPullRequestComment(projid string, repoRefID string, pr PullRequestResponse) error {
+func (a *API) sendPullRequestComment(projid string, repoRefID string, pr pullRequestResponse) error {
 
 	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/pullRequests/%d/threads`, url.PathEscape(pr.Repository.ID), pr.PullRequestID)
 	var out struct {

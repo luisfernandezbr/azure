@@ -7,7 +7,7 @@ import (
 	"github.com/pinpt/agent.next/sdk"
 )
 
-func (a *API) sendPullRequestCommit(projid string, repoRefID string, p PullRequestResponseWithShas) error {
+func (a *API) sendPullRequestCommit(projid string, repoRefID string, p pullRequestResponseWithShas) error {
 	sha := p.commitSHAs[len(p.commitSHAs)-1]
 	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/commits/%s`, url.PathEscape(p.Repository.ID), url.PathEscape(sha))
 	var out singleCommitResponse
@@ -39,7 +39,7 @@ func (a *API) sendPullRequestCommit(projid string, repoRefID string, p PullReque
 	return a.pipe.Write(commit)
 }
 
-func (a *API) sendPullRequestCommits(projid string, reponame string, pr PullRequestResponseWithShas) error {
+func (a *API) sendPullRequestCommits(projid string, reponame string, pr pullRequestResponseWithShas) error {
 	endpoint := fmt.Sprintf(`_apis/git/repositories/%s/pullRequests/%d/commits`, url.PathEscape(pr.Repository.ID), pr.PullRequestID)
 	var out struct {
 		Value []commitsResponseLight `json:"value"`
