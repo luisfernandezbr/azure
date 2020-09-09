@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pinpt/agent.next.azure/internal/api"
 	"github.com/pinpt/agent.next/sdk"
@@ -15,7 +16,7 @@ type webookPayload struct {
 	EventType string `json:"eventType"`
 }
 
-type webhookPayloadCreatedDeleted struct {
+type webhookWorkPayloadCreatedDeleted struct {
 	Resource struct {
 		ID         int `json:"id"`
 		WorkItemID int `json:"workItemId"`
@@ -25,6 +26,10 @@ type webhookPayloadCreatedDeleted struct {
 			ID string `json:"id"`
 		} `json:"project"`
 	} `json:"resourceContainers"`
+}
+
+type webhookSourcecodePayload struct {
+	Resource api.PullRequestResponse `json:"resource"`
 }
 
 // WebHook is called when a webhook is received on behalf of the integration
@@ -55,15 +60,36 @@ func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
 	if strings.HasPrefix(payload.EventType, "workitem.") {
 		return g.handleWorkWebHooks(customerID, webhook.IntegrationInstanceID(), payload.EventType, rawPayload, pipe, a)
 	}
-	return g.handleSourceCodeWebHooks(payload.EventType, pipe, a)
+	return g.handleSourceCodeWebHooks(payload.EventType, rawPayload, pipe, a)
 }
-func (g *AzureIntegration) handleSourceCodeWebHooks(eventType string, pipe sdk.Pipe, a *api.API) error {
+func (g *AzureIntegration) handleSourceCodeWebHooks(eventType string, rawPayload []byte, pipe sdk.Pipe, a *api.API) error {
+	var data webhookSourcecodePayload
+	if err := json.Unmarshal(rawPayload, &data); err != nil {
+		return err
+	}
+	if eventType == "git.pullrequest.merged" || eventType == "git.pullrequest.updated" {
+		return a.ProcessPullRequests(
+			[]api.PullRequestResponse{data.Resource},
+			data.Resource.Repository.Project.ID,
+			data.Resource.Repository.ID,
+			data.Resource.Repository.Name, time.Time{},
+		)
+
+	}
+	if eventType == "git.pullrequest.created" {
+		return a.FetchPullRequests(
+			data.Resource.Repository.Project.ID,
+			data.Resource.Repository.ID,
+			data.Resource.Repository.Name, time.Time{},
+		)
+	}
+	sdk.LogInfo(g.logger, "webhook type not handled", "type", eventType)
 	return nil
 }
 
 func (g *AzureIntegration) handleWorkWebHooks(customerID, intID, eventType string, rawPayload []byte, pipe sdk.Pipe, a *api.API) error {
 
-	var data webhookPayloadCreatedDeleted
+	var data webhookWorkPayloadCreatedDeleted
 	if err := json.Unmarshal(rawPayload, &data); err != nil {
 		return err
 	}
