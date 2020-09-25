@@ -374,7 +374,7 @@ func (a *API) UpdateIssue(refid string, obj *sdk.WorkIssueUpdateMutation) error 
 			Value: *title,
 		})
 	}
-	if status := obj.Set.Status; status != nil {
+	if status := obj.Set.Transition; status != nil {
 		payload = append(payload, item{
 			OP:    "add",
 			Path:  "/fields/System.State",
