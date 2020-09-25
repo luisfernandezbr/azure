@@ -217,6 +217,8 @@ github.com/jhaynie/go-vcr/v2 v2.0.2 h1:ztiOOC78+aUcGv26LpOI7MHOJ0FiDpPD8uFU+nTqE
 github.com/jhaynie/go-vcr/v2 v2.0.2/go.mod h1:aRoMK63qzV9c++GDPbwFj5iFuwWaT0qoVeWIpG4d+nI=
 github.com/jhaynie/oauth1 v1.0.0 h1:aUYR5UPDHOqjwsaWZ/xS5Rx2owCdkxedFyIL4xVa7oI=
 github.com/jhaynie/oauth1 v1.0.0/go.mod h1:oTpsv20X/CgQFd+OY4wOnWtJbnNcwzZixGh7YlRH8rg=
+github.com/jhaynie/oauth1 v1.0.1 h1:0olnrHWE7h4dgGXTTzDFWVM8NK/wwbo2i/vvQqKSI+s=
+github.com/jhaynie/oauth1 v1.0.1/go.mod h1:oTpsv20X/CgQFd+OY4wOnWtJbnNcwzZixGh7YlRH8rg=
 github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af/go.mod h1:Nht3zPeWKUH0NzdCt2Blrr5ys8VGpn0CEB0cQHVjt7k=
 github.com/joho/godotenv v1.3.0/go.mod h1:7hK45KPybAkOC6peb+G5yklZfMxEjkZhHbwpqxOKXbg=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
@@ -336,6 +338,8 @@ github.com/pinpt/integration-sdk v0.0.1178 h1:cxTyoia/yEXGfIhOidJ+UdUWALYRlBJgRV
 github.com/pinpt/integration-sdk v0.0.1178/go.mod h1:M3xXTd460Cr+ulMNcEI1/npfKIHTOvO98jySA9rGo88=
 github.com/pinpt/integration-sdk v0.0.1179 h1:hoEb3DkgbsNmvjU27qHSRsNSi+ypF1k6rKtZM8Zrhj8=
 github.com/pinpt/integration-sdk v0.0.1179/go.mod h1:M3xXTd460Cr+ulMNcEI1/npfKIHTOvO98jySA9rGo88=
+github.com/pinpt/integration-sdk v0.0.1198 h1:IWYrBUBhzvnoFB2wxwmxtQ9FANvBkgUbVv9N9ZcGZKM=
+github.com/pinpt/integration-sdk v0.0.1198/go.mod h1:M3xXTd460Cr+ulMNcEI1/npfKIHTOvO98jySA9rGo88=
 github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4 h1:49lOXmGaUpV9Fz3gd7TFZY106KVlPVa5jcYD1gaQf98=
 github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4/go.mod h1:4OwLy04Bl9Ef3GJJCoec+30X3LQs/0/m4HFRt/2LUSA=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=

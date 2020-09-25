@@ -100,6 +100,7 @@ func (g *AzureIntegration) fetchAccounts(customerID, integrationID string, confi
 			TotalCount:  &count,
 			Type:        sdk.ConfigAccountTypeOrg,
 			Public:      proj.Visibility == sdk.WorkProjectVisibilityPublic,
+			Selected:    sdk.BoolPointer(true),
 		})
 	}
 

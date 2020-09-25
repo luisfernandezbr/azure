@@ -27,6 +27,7 @@ const toAccount = (data: ConfigAccount): Account => {
 		name: data.name || '',
 		description: data.description || '',
 		totalCount: data.totalCount || 0,
+		selected: !!data.selected
 	}
 };
 
