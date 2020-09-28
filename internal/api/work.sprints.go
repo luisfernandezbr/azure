@@ -3,7 +3,7 @@ package api
 import (
 	"fmt"
 
-	"github.com/pinpt/agent/sdk"
+	"github.com/pinpt/agent/v4/sdk"
 )
 
 func (a *API) FetchSprints(projid string, teamids []string) error {

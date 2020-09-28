@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/pinpt/azure/internal/api"
-	"github.com/pinpt/agent/sdk"
+	"github.com/pinpt/agent/v4/sdk"
 )
 
 // Export is called to tell the integration to run an export

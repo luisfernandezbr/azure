@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/pinpt/agent/sdk"
+	"github.com/pinpt/agent/v4/sdk"
 )
 
 func (a *API) sendPullRequestCommit(projid string, repoRefID string, p PullRequestResponseWithShas) error {

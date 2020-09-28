@@ -318,8 +318,8 @@ github.com/pelletier/go-toml v1.4.0/go.mod h1:PN7xzY2wHTK0K9p34ErDQMlFxa51Fk0OUr
 github.com/performancecopilot/speed v3.0.0+incompatible/go.mod h1:/CLtqpZ5gBg1M9iaPbIdPPGyKcA8hKdoy6hAWba7Yac=
 github.com/pierrec/lz4 v1.0.2-0.20190131084431-473cd7ce01a1/go.mod h1:3/3N9NVKO0jef7pBehbT1qWhCMrIgbYNnFAZCqQ5LRc=
 github.com/pierrec/lz4 v2.0.5+incompatible/go.mod h1:pdkljMzZIN41W+lC3N2tnIh5sFi+IEE17M5jbnwPHcY=
-github.com/pinpt/agent v0.0.0-20200928133622-bcfa17778faa h1:BaI0mkLBSgAGwYhreeuczA0IATE6FYuS7b+Z1maK1CA=
-github.com/pinpt/agent v0.0.0-20200928133622-bcfa17778faa/go.mod h1:qiM2telREpN7sxQ6x48/TELM354eUCGxTw8fC27hPQE=
+github.com/pinpt/agent/v4 v4.0.0 h1:t1LNcT+DE0Kw1Vof+E77EccyzNMHeO/vzfjzXc/hzSM=
+github.com/pinpt/agent/v4 v4.0.0/go.mod h1:f5GJHwiENKC+B+K6edGbQs0VEfKolnPBlDuyGaQp+yE=
 github.com/pinpt/go-common/v10 v10.0.17 h1:434frXTXGxb/lFrotRL61Y+jpCR+EOtDR67cigyX+Fo=
 github.com/pinpt/go-common/v10 v10.0.17/go.mod h1:uRe9KzBE26kjqD+2UgreBQqesesXyBUEIjBT2NEK3kk=
 github.com/pinpt/go-common/v10 v10.0.24 h1:cjysbvUOoKTWAYwN41X4wtDuvwEoy9xO3zOEIMhxbUw=
