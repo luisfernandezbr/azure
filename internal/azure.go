@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/pinpt/azure/internal/api"
-	"github.com/pinpt/agent/sdk"
+	"github.com/pinpt/agent/v4/sdk"
 )
 
 // AzureIntegration is an integration for Azure

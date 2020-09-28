@@ -3,7 +3,7 @@ package api
 import (
 	"errors"
 
-	"github.com/pinpt/agent/sdk"
+	"github.com/pinpt/agent/v4/sdk"
 )
 
 func stringEquals(str string, vals ...string) bool {

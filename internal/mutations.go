@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/pinpt/azure/internal/api"
-	"github.com/pinpt/agent/sdk"
+	"github.com/pinpt/agent/v4/sdk"
 )
 
 // Mutation is called when a mutation is received on behalf of the integration
