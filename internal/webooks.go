@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pinpt/agent.next.azure/internal/api"
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/azure/internal/api"
+	"github.com/pinpt/agent/sdk"
 )
 
 const webhookVersion = "1" // change this to have the webhook uninstalled and reinstalled new

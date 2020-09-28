@@ -3,8 +3,8 @@ package internal
 import (
 	"errors"
 
-	"github.com/pinpt/agent.next.azure/internal/api"
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/azure/internal/api"
+	"github.com/pinpt/agent/sdk"
 )
 
 // Mutation is called when a mutation is received on behalf of the integration

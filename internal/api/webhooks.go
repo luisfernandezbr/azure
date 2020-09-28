@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/agent/sdk"
 )
 
 var eventTypes = []string{

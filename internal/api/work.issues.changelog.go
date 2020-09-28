@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/agent/sdk"
 )
 
 func (a *API) fetchChangeLog(itemtype, projid string, issueid int) ([]sdk.WorkIssueChangeLog, time.Time, error) {
