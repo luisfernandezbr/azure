@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/agent/sdk"
 )
 
 // map[project]process

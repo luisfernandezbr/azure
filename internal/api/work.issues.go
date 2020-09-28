@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/agent/sdk"
 )
 
 const whereDateFormat = `01/02/2006 15:04:05Z`

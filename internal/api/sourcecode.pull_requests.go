@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/agent/sdk"
 )
 
 // FetchPullRequests calls the pull request api and processes the reponse writing each object to the pipeline

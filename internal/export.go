@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pinpt/agent.next.azure/internal/api"
-	"github.com/pinpt/agent.next/sdk"
+	"github.com/pinpt/azure/internal/api"
+	"github.com/pinpt/agent/sdk"
 )
 
 // Export is called to tell the integration to run an export
