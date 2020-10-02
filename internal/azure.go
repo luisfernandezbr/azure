@@ -3,8 +3,8 @@ package internal
 import (
 	"errors"
 
-	"github.com/pinpt/azure/internal/api"
 	"github.com/pinpt/agent/v4/sdk"
+	"github.com/pinpt/azure/internal/api"
 )
 
 // AzureIntegration is an integration for Azure

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pinpt/azure/internal/api"
 	"github.com/pinpt/agent/v4/sdk"
+	"github.com/pinpt/azure/internal/api"
 )
 
 // Export is called to tell the integration to run an export

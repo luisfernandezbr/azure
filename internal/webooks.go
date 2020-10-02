@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pinpt/azure/internal/api"
 	"github.com/pinpt/agent/v4/sdk"
+	"github.com/pinpt/azure/internal/api"
 )
 
 const webhookVersion = "1" // change this to have the webhook uninstalled and reinstalled new
