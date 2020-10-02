@@ -3,16 +3,16 @@ package internal
 import (
 	"errors"
 
-	"github.com/pinpt/azure/internal/api"
 	"github.com/pinpt/agent/v4/sdk"
+	"github.com/pinpt/azure/internal/api"
 )
 
 // Mutation is called when a mutation is received on behalf of the integration
-func (g *AzureIntegration) Mutation(mut sdk.Mutation) error {
+func (g *AzureIntegration) Mutation(mut sdk.Mutation) (*sdk.MutationResponse, error) {
 
 	auth := mut.User().APIKeyAuth
 	if auth == nil {
-		return errors.New("missing auth")
+		return nil, errors.New("missing auth")
 	}
 	customerID := mut.CustomerID()
 	integrationID := mut.IntegrationInstanceID()
@@ -25,18 +25,18 @@ func (g *AzureIntegration) Mutation(mut sdk.Mutation) error {
 		case *sdk.WorkIssueCreateMutation:
 			// mu.Type.Name should be something like Bug, Epic, Issue, etc.
 			if err := a.CreateIssue(mu); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	case sdk.UpdateAction:
 		switch mu := mut.Payload().(type) {
 		case *sdk.WorkIssueUpdateMutation:
 			if err := a.UpdateIssue(mut.ID(), mu); err != nil {
-				return err
+				return nil, err
 			}
 		case *sdk.SourcecodePullRequestUpdateMutation:
 			if err := a.UpdatePullRequest(mut.ID(), mu); err != nil {
-				return err
+				return nil, err
 			}
 		}
 
@@ -44,5 +44,5 @@ func (g *AzureIntegration) Mutation(mut sdk.Mutation) error {
 
 	}
 	sdk.LogInfo(g.logger, "mutation not implemented")
-	return nil
+	return nil, nil
 }
