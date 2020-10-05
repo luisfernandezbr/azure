@@ -217,7 +217,7 @@ func (a *API) FetchIssues(projid string, ids []string) error {
 				IntegrationInstanceID: &a.integrationID,
 				Identifier:            fmt.Sprintf("%s-%d", fields.TeamProject, item.ID),
 				Priority:              fmt.Sprint(fields.Priority),
-				ProjectID:             sdk.NewWorkProjectID(a.customerID, projid, a.refType),
+				ProjectIds:            []string{sdk.NewWorkProjectID(a.customerID, projid, a.refType)},
 				RefID:                 a.createIssueID(projid, item.ID),
 				RefType:               a.refType,
 				ReporterRefID:         fields.CreatedBy.ID,
