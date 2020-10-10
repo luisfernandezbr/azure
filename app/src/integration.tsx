@@ -90,56 +90,117 @@ const SelfManagedForm = ({ setLoading, setAccounts }: { setLoading: (val: boolea
 	return <Form type={FormType.API} name='AzureDevOps' callback={verify} />;
 };
 
+const makeAccountsFromConfig = (config: Config) => {
+	return Object.keys(config.accounts ?? {}).map((key: string) => config.accounts?.[key]) as Account[];
+};
+
 const Integration = () => {
 	const { installed, setInstallEnabled, setLoading, loading, currentURL, config, isFromRedirect, isFromReAuth, setConfig, setValidate } = useIntegration();
 	const [type, setType] = useState<IntegrationType | undefined>(config.integration_type);
-	const [, setRerender] = useState(0);
+	const [state, setRerender] = useState(0);
 	const [accounts, setAccounts] = useState<Account[]>([]);
-	const [fetching, setFetching] = useState<Boolean>(false);
 
 	useEffect(() => {
-		if (loading) {
-			return
-		}
 		// ============= OAuth 2.0 =============
-		if (isFromRedirect && currentURL) {
+		if (!loading && isFromRedirect && currentURL && !installed && !accounts?.length) {
 			const search = currentURL.split('?');
 			const tok = search[1].split('&');
-			tok.forEach(async token => {
+			let _token = ""
+			let _refresh = ""
+			tok.forEach(token => {
 				const t = token.split('=');
 				const k = t[0];
 				const v = t[1];
+				if (k === 'token'){
+					_token  = v
+				}
+				if (k === 'refresh'){
+					_refresh  = v
+				}
 				if (k === 'profile') {
 					const profile = JSON.parse(atob(decodeURIComponent(v)));
+
+					let org = ""
+					if  ( profile.Organizations?.length ){
+						org = profile.Organizations[0].accountName
+					}
+
 					config.oauth2_auth = {
 						date_ts: Date.now(),
-						url: 'https://dev.azure.org',
-						access_token: profile.Integration.auth.accessToken,
-						refresh_token: profile.Integration.auth.refreshToken,
-						scopes: profile.Integration.auth.scopes,
+						url: 'https://dev.azure.com/'+org,
+						access_token: _token,
+						refresh_token: _refresh,
+						scopes: '',
 					};
 					config.integration_type = IntegrationType.CLOUD
 					setConfig(config);
+					setRerender(Date.now());
 				}
 			});
 		}
 
-	}, [loading, isFromRedirect, currentURL, config, setConfig, fetching]);
+	}, [loading, currentURL, isFromRedirect, setConfig, setRerender]);
+
+	useEffect(() => {
+		if (accounts?.length === 0 && config.oauth2_auth) {
+			const run = async () => {
+				setLoading(true);
+				try {
+					const fetch = async () => {
+						let data: validationResponse;
+						try {
+							data = await setValidate(config);
+						} catch (err) {
+							console.error(err);
+							throw new Error(err.message);
+						}
+						const newconfig = { ...config };
+						newconfig.accounts = {};
+						if (data?.accounts) {
+							var t = data.accounts as Account[];
+							t.forEach(( item ) => {
+								if ( newconfig.accounts  && newconfig.accounts){
+									const selected = newconfig.accounts[item.id]?.selected
+									if (installed) {
+										item.selected = !!selected
+									}
+									newconfig.accounts[item.id] = item;
+								}
+							});
+						}
+						setAccounts(data.accounts.map((acct) => toAccount(acct)));
+						setLoading(false);
+						setConfig(newconfig);
+						setRerender(Date.now());
+					}
+					fetch()
+				} catch (err) {
+					console.error(err);
+				}
+			};
+			run();
+		}
+	}, [setValidate, config, setConfig, setRerender, state, setAccounts]);
 
 	useEffect(() => {
 		if (type) {
 			config.integration_type = type;
-			setConfig(config);
 			setRerender(Date.now());
 		}
 	}, [type]);
 
 	useEffect(() => {
-		config.accounts = config.accounts || {};
-		setInstallEnabled(installed ? true : Object.keys(config.accounts).length > 0);
-		setConfig(config);
-		setRerender(Date.now());
-	}, [accounts]);
+		if (installed || config?.accounts) {
+			setAccounts(makeAccountsFromConfig(config));
+		} 
+	}, [installed, config, setAccounts ]);
+
+	useEffect(() => {
+		if ( accounts?.length > 0 && !installed ){
+			setInstallEnabled(installed ? true : Object.keys(accounts).length > 0);
+			setRerender(Date.now());
+		}
+	}, [accounts, installed, setInstallEnabled]);
 
 	if (loading) {
 		return <Loader screen />;

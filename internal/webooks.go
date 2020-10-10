@@ -119,10 +119,17 @@ func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64
 	integrationID := instance.IntegrationInstanceID()
 	state := instance.State()
 	pipe := instance.Pipe()
-	auth := instance.Config().APIKeyAuth
 
-	client := g.manager.HTTPManager().New(auth.URL, nil)
-	a := api.New(g.logger, client, state, pipe, customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+	var a *api.API
+	if instance.Config().APIKeyAuth != nil {
+		auth := instance.Config().APIKeyAuth
+		client := g.manager.HTTPManager().New(auth.URL, nil)
+		a = api.New(g.logger, client, state, pipe, customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+	} else {
+		auth := instance.Config().OAuth2Auth
+		client := g.manager.HTTPManager().New(auth.URL, nil)
+		a = api.New(g.logger, client, state, pipe, customerID, integrationID, g.refType, concurr, sdk.WithOAuth2Refresh(g.manager, g.refType, auth.AccessToken, *auth.RefreshToken))
+	}
 
 	// fetch projects
 	projects, err := a.FetchProjects()
