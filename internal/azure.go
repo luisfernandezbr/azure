@@ -32,8 +32,10 @@ func (g *AzureIntegration) Start(logger sdk.Logger, config sdk.Config, manager s
 // Enroll is called when a new integration instance is added
 func (g *AzureIntegration) Enroll(instance sdk.Instance) error {
 	config := instance.Config()
-	if config.APIKeyAuth == nil {
-		return errors.New("Missing --apikey_auth")
+	if config.APIKeyAuth != nil {
+		if config.APIKeyAuth.APIKey == "" {
+			return errors.New("Missing --apikey_auth")
+		}
 	}
 	ok, concurr := config.GetInt("concurrency")
 	if !ok {
