@@ -154,24 +154,23 @@ const Integration = () => {
 							console.error(err);
 							throw new Error(err.message);
 						}
-						const newconfig = { ...config };
-						newconfig.accounts = {};
+						config.accounts = config.accounts || {};
 						if (data?.accounts) {
 							var t = data.accounts as Account[];
 							t.forEach(( item ) => {
-								if ( newconfig.accounts  && newconfig.accounts){
-									const selected = newconfig.accounts[item.id]?.selected
+								if ( config && config.accounts){
+									const selected = config.accounts[item.id]?.selected
 									if (installed) {
 										item.selected = !!selected
 									}
-									newconfig.accounts[item.id] = item;
+									config.accounts[item.id] = item;
 								}
 							});
 						}
 						setAccounts(data.accounts.map((acct) => toAccount(acct)));
+						setInstallEnabled(installed ? true : Object.keys(config.accounts).length > 0);
+						setConfig(config);
 						setLoading(false);
-						setConfig(newconfig);
-						setRerender(Date.now());
 					}
 					fetch()
 				} catch (err) {
@@ -194,13 +193,6 @@ const Integration = () => {
 			setAccounts(makeAccountsFromConfig(config));
 		} 
 	}, [installed, config, setAccounts ]);
-
-	useEffect(() => {
-		if ( accounts?.length > 0 && !installed ){
-			setInstallEnabled(installed ? true : Object.keys(accounts).length > 0);
-			setRerender(Date.now());
-		}
-	}, [accounts, installed, setInstallEnabled]);
 
 	if (loading) {
 		return <Loader screen />;
