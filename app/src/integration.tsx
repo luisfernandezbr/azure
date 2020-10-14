@@ -122,7 +122,7 @@ const Integration = () => {
 						url: 'https://dev.azure.com/'+org,
 						access_token: profile.Integrations.auth.refreshToken,
 						refresh_token: profile.Integrations.auth.accessToken,
-						scopes: profile.auth.scopes,
+						scopes: profile.Integrations.auth.scopes,
 					};
 					config.integration_type = IntegrationType.CLOUD
 					setConfig(config);
