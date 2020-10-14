@@ -120,8 +120,8 @@ const Integration = () => {
 					config.oauth2_auth = {
 						date_ts: Date.now(),
 						url: 'https://dev.azure.com/'+org,
-						access_token: profile.Integrations.auth.refreshToken,
-						refresh_token: profile.Integrations.auth.accessToken,
+						access_token: profile.Integrations.auth.accessToken,
+						refresh_token: profile.Integrations.auth.refreshToken,
 						scopes: profile.Integrations.auth.scopes,
 					};
 					config.integration_type = IntegrationType.CLOUD
