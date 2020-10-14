@@ -105,18 +105,10 @@ const Integration = () => {
 		if (!loading && isFromRedirect && currentURL && !installed && !accounts?.length) {
 			const search = currentURL.split('?');
 			const tok = search[1].split('&');
-			let _token = ""
-			let _refresh = ""
 			tok.forEach(token => {
 				const t = token.split('=');
 				const k = t[0];
 				const v = t[1];
-				if (k === 'token'){
-					_token  = v
-				}
-				if (k === 'refresh'){
-					_refresh  = v
-				}
 				if (k === 'profile') {
 					const profile = JSON.parse(atob(decodeURIComponent(v)));
 
@@ -128,9 +120,9 @@ const Integration = () => {
 					config.oauth2_auth = {
 						date_ts: Date.now(),
 						url: 'https://dev.azure.com/'+org,
-						access_token: _token,
-						refresh_token: _refresh,
-						scopes: '',
+						access_token: profile.auth.refreshToken,
+						refresh_token: profile.auth.accessToken,
+						scopes: profile.auth.scopes,
 					};
 					config.integration_type = IntegrationType.CLOUD
 					setConfig(config);
