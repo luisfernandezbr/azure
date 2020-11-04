@@ -10,6 +10,7 @@ import (
 // Mutation is called when a mutation is received on behalf of the integration
 func (g *AzureIntegration) Mutation(mut sdk.Mutation) (*sdk.MutationResponse, error) {
 
+	logger := mut.Logger()
 	auth := mut.User().APIKeyAuth
 	if auth == nil {
 		return nil, errors.New("missing auth")
@@ -18,7 +19,7 @@ func (g *AzureIntegration) Mutation(mut sdk.Mutation) (*sdk.MutationResponse, er
 	integrationID := mut.IntegrationInstanceID()
 	basicAuth := sdk.WithBasicAuth("", auth.APIKey)
 	client := g.manager.HTTPManager().New(auth.URL, nil)
-	a := api.New(g.logger, client, mut.State(), mut.Pipe(), customerID, integrationID, g.refType, 1, basicAuth)
+	a := api.New(logger, client, mut.State(), mut.Pipe(), customerID, integrationID, g.refType, 1, basicAuth)
 	switch mut.Action() {
 	case sdk.CreateAction:
 		switch mu := mut.Payload().(type) {
@@ -43,6 +44,6 @@ func (g *AzureIntegration) Mutation(mut sdk.Mutation) (*sdk.MutationResponse, er
 	case sdk.DeleteAction:
 
 	}
-	sdk.LogInfo(g.logger, "mutation not implemented")
+	sdk.LogInfo(logger, "mutation not implemented")
 	return nil, nil
 }

@@ -38,7 +38,7 @@ func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
 	if err := json.Unmarshal(webhook.Bytes(), &payload); err != nil {
 		return err
 	}
-
+	logger := webhook.Logger()
 	pipe := webhook.Pipe()
 	config := webhook.Config()
 	integrationID := webhook.IntegrationInstanceID()
@@ -47,7 +47,7 @@ func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
 	if !ok {
 		concurr = 10
 	}
-	url, creds, err := g.getHTTPCredOpts(config)
+	url, creds, err := g.getHTTPCredOpts(logger, config)
 	if err != nil {
 		return err
 	}
@@ -55,14 +55,14 @@ func (g *AzureIntegration) WebHook(webhook sdk.WebHook) error {
 	customerID := webhook.CustomerID()
 	rawPayload := webhook.Bytes()
 
-	a := api.New(g.logger, client, webhook.State(), webhook.Pipe(), customerID, integrationID, g.refType, concurr, creds)
+	a := api.New(logger, client, webhook.State(), webhook.Pipe(), customerID, integrationID, g.refType, concurr, creds)
 
 	if strings.HasPrefix(payload.EventType, "workitem.") {
 		return g.handleWorkWebHooks(customerID, webhook.IntegrationInstanceID(), payload.EventType, rawPayload, pipe, a)
 	}
-	return g.handleSourceCodeWebHooks(payload.EventType, rawPayload, pipe, a)
+	return g.handleSourceCodeWebHooks(logger, payload.EventType, rawPayload, pipe, a)
 }
-func (g *AzureIntegration) handleSourceCodeWebHooks(eventType string, rawPayload []byte, pipe sdk.Pipe, a *api.API) error {
+func (g *AzureIntegration) handleSourceCodeWebHooks(logger sdk.Logger, eventType string, rawPayload []byte, pipe sdk.Pipe, a *api.API) error {
 	var data webhookSourcecodePayload
 	if err := json.Unmarshal(rawPayload, &data); err != nil {
 		return err
@@ -83,7 +83,7 @@ func (g *AzureIntegration) handleSourceCodeWebHooks(eventType string, rawPayload
 			data.Resource.Repository.Name, time.Time{},
 		)
 	}
-	sdk.LogInfo(g.logger, "webhook type not handled", "type", eventType)
+	sdk.LogInfo(logger, "webhook type not handled", "type", eventType)
 	return nil
 }
 
@@ -114,21 +114,23 @@ func (g *AzureIntegration) handleWorkWebHooks(customerID, intID, eventType strin
 }
 
 func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64) error {
-
+	return nil
+	logger := instance.Logger()
 	customerID := instance.CustomerID()
 	integrationID := instance.IntegrationInstanceID()
 	state := instance.State()
 	pipe := instance.Pipe()
+	config := instance.Config()
 
 	var a *api.API
-	if instance.Config().APIKeyAuth != nil {
-		auth := instance.Config().APIKeyAuth
+	if config.APIKeyAuth != nil {
+		auth := config.APIKeyAuth
 		client := g.manager.HTTPManager().New(auth.URL, nil)
-		a = api.New(g.logger, client, state, pipe, customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
+		a = api.New(logger, client, state, pipe, customerID, integrationID, g.refType, concurr, sdk.WithBasicAuth("", auth.APIKey))
 	} else {
-		auth := instance.Config().OAuth2Auth
+		auth := config.OAuth2Auth
 		client := g.manager.HTTPManager().New(auth.URL, nil)
-		a = api.New(g.logger, client, state, pipe, customerID, integrationID, g.refType, concurr, sdk.WithOAuth2Refresh(g.manager, g.refType, auth.AccessToken, *auth.RefreshToken))
+		a = api.New(logger, client, state, pipe, customerID, integrationID, g.refType, concurr, sdk.WithOAuth2Refresh(g.manager, g.refType, auth.AccessToken, *auth.RefreshToken))
 	}
 
 	// fetch projects
@@ -146,11 +148,11 @@ func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64
 			}
 			// check and see if we need to upgrade our webhook
 			if strings.Contains(url, "&version="+webhookVersion) {
-				sdk.LogInfo(g.logger, "skipping web hook install since already installed")
+				sdk.LogInfo(logger, "skipping web hook install since already installed")
 				continue
 			}
 			var removed bool
-			if removed, err = g.removeWebHook(webhookManager, a, state, customerID, integrationID, proj.RefID); err != nil {
+			if removed, err = g.removeWebHook(logger, webhookManager, a, state, customerID, integrationID, proj.RefID); err != nil {
 				return err
 			}
 			if !removed {
@@ -165,7 +167,7 @@ func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64
 		// each project creates a bunch of webhooks, we need to store the ids of those in state so that we can delete them later
 		ids, err := a.CreateWebhook(url, proj.RefID)
 		if err != nil {
-			sdk.LogError(g.logger, "error creating webhook", "err", err)
+			sdk.LogError(logger, "error creating webhook", "err", err)
 			webhookManager.Errored(customerID, integrationID, g.refType, proj.RefID, sdk.WebHookScopeProject, err)
 			continue
 		}
@@ -177,18 +179,20 @@ func (g *AzureIntegration) registerWebHooks(instance sdk.Instance, concurr int64
 }
 
 func (g *AzureIntegration) unregisterWebHooks(instance sdk.Instance, concurr int64) error {
+	logger := instance.Logger()
 	customerID := instance.CustomerID()
 	integrationID := instance.IntegrationInstanceID()
 	state := instance.State()
 	pipe := instance.Pipe()
+	config := instance.Config()
 
-	url, creds, err := g.getHTTPCredOpts(instance.Config())
+	url, creds, err := g.getHTTPCredOpts(logger, config)
 	if err != nil {
 		return err
 	}
 
 	client := g.manager.HTTPManager().New(url, nil)
-	a := api.New(g.logger, client, state, pipe, customerID, integrationID, g.refType, concurr, creds)
+	a := api.New(logger, client, state, pipe, customerID, integrationID, g.refType, concurr, creds)
 
 	// fetch projects
 	projects, err := a.FetchProjects()
@@ -198,7 +202,7 @@ func (g *AzureIntegration) unregisterWebHooks(instance sdk.Instance, concurr int
 	webhookManager := g.manager.WebHookManager()
 
 	for _, proj := range projects {
-		if _, err := g.removeWebHook(webhookManager, a, state, customerID, integrationID, proj.RefID); err != nil {
+		if _, err := g.removeWebHook(logger, webhookManager, a, state, customerID, integrationID, proj.RefID); err != nil {
 			return err
 		}
 	}
@@ -206,11 +210,11 @@ func (g *AzureIntegration) unregisterWebHooks(instance sdk.Instance, concurr int
 	return nil
 }
 
-func (g *AzureIntegration) removeWebHook(webhookManager sdk.WebHookManager, a *api.API, state sdk.State, customerID, integrationID, projid string) (bool, error) {
+func (g *AzureIntegration) removeWebHook(logger sdk.Logger, webhookManager sdk.WebHookManager, a *api.API, state sdk.State, customerID, integrationID, projid string) (bool, error) {
 	var ids []string
 	if ok, err := state.Get("webhooks_"+projid, &ids); ok {
 		if err := a.DeleteWebhooks(ids); err != nil {
-			sdk.LogError(g.logger, "error removing webhook", "err", err)
+			sdk.LogError(logger, "error removing webhook", "err", err)
 			webhookManager.Errored(customerID, integrationID, g.refType, projid, sdk.WebHookScopeProject, err)
 			return false, nil
 		}

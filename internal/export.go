@@ -10,17 +10,17 @@ import (
 
 // Export is called to tell the integration to run an export
 func (g *AzureIntegration) Export(export sdk.Export) error {
-	sdk.LogInfo(g.logger, "export started")
+	logger := export.Logger()
 	pipe := export.Pipe()
 	state := export.State()
 	customerID := export.CustomerID()
 	integrationID := export.IntegrationInstanceID()
 
-	sdk.LogDebug(g.logger, "export starting")
+	sdk.LogInfo(logger, "export started")
 
 	config := export.Config()
 
-	url, creds, err := g.getHTTPCredOpts(config)
+	url, creds, err := g.getHTTPCredOpts(logger, config)
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 
 	workUsermap := map[string]*sdk.WorkUser{}
 	sourcecodeUsermap := map[string]*sdk.SourceCodeUser{}
-	a := api.New(g.logger, client, state, pipe, customerID, integrationID, g.refType, concurr, creds)
+	a := api.New(logger, client, state, pipe, customerID, integrationID, g.refType, concurr, creds)
 	if err := a.FetchStatuses(); err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func (g *AzureIntegration) Export(export sdk.Export) error {
 	})
 	err = async.Wait()
 	if err == nil {
-		sdk.LogInfo(g.logger, "export finished")
+		sdk.LogInfo(logger, "export finished")
 	}
 	return err
 }

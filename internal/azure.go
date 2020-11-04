@@ -9,11 +9,9 @@ import (
 
 // AzureIntegration is an integration for Azure
 type AzureIntegration struct {
-	logger     sdk.Logger
 	config     sdk.Config
 	manager    sdk.Manager
 	refType    string
-	customerID string
 	httpClient sdk.HTTPClient
 }
 
@@ -21,16 +19,16 @@ var _ sdk.Integration = (*AzureIntegration)(nil)
 
 // Start is called when the integration is starting up
 func (g *AzureIntegration) Start(logger sdk.Logger, config sdk.Config, manager sdk.Manager) error {
-	g.logger = sdk.LogWith(logger, "pkg", "azure")
 	g.config = config
 	g.manager = manager
 	g.refType = "azure"
-	sdk.LogInfo(g.logger, "starting")
+	sdk.LogInfo(logger, "starting")
 	return nil
 }
 
 // Enroll is called when a new integration instance is added
 func (g *AzureIntegration) Enroll(instance sdk.Instance) error {
+
 	config := instance.Config()
 	if config.APIKeyAuth != nil {
 		if config.APIKeyAuth.APIKey == "" {
@@ -57,13 +55,13 @@ func (g *AzureIntegration) Dismiss(instance sdk.Instance) error {
 	return g.unregisterWebHooks(instance, concurr)
 }
 
-func (g *AzureIntegration) getHTTPCredOpts(config sdk.Config) (string, sdk.WithHTTPOption, error) {
+func (g *AzureIntegration) getHTTPCredOpts(logger sdk.Logger, config sdk.Config) (string, sdk.WithHTTPOption, error) {
 	if auth := config.APIKeyAuth; auth != nil {
-		sdk.LogInfo(g.logger, "using basic auth")
+		sdk.LogInfo(logger, "using basic auth")
 		return auth.URL, sdk.WithBasicAuth("", auth.APIKey), nil
 	}
 	if auth := config.OAuth2Auth; auth != nil {
-		sdk.LogInfo(g.logger, "using oauth2")
+		sdk.LogInfo(logger, "using oauth2")
 		return auth.URL, sdk.WithOAuth2Refresh(
 			g.manager, g.refType,
 			auth.AccessToken,
@@ -73,8 +71,8 @@ func (g *AzureIntegration) getHTTPCredOpts(config sdk.Config) (string, sdk.WithH
 	return "", nil, errors.New("missing auth")
 }
 
-func (g *AzureIntegration) fetchAccounts(customerID, integrationID string, config sdk.Config) (*sdk.Config, error) {
-	url, creds, err := g.getHTTPCredOpts(config)
+func (g *AzureIntegration) fetchAccounts(logger sdk.Logger, customerID, integrationID string, config sdk.Config) (*sdk.Config, error) {
+	url, creds, err := g.getHTTPCredOpts(logger, config)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +81,7 @@ func (g *AzureIntegration) fetchAccounts(customerID, integrationID string, confi
 		concurr = 10
 	}
 	client := g.manager.HTTPManager().New(url, nil)
-	a := api.New(g.logger, client, nil, nil, customerID, integrationID, g.refType, concurr, creds)
+	a := api.New(logger, client, nil, nil, customerID, integrationID, g.refType, concurr, creds)
 	projects, err := a.FetchProjects()
 	if err != nil {
 		return nil, err
@@ -116,25 +114,27 @@ func (g *AzureIntegration) fetchAccounts(customerID, integrationID string, confi
 
 // AutoConfigure is called when a cloud integration has requested to be auto configured
 func (g *AzureIntegration) AutoConfigure(autoconfig sdk.AutoConfigure) (*sdk.Config, error) {
+	logger := autoconfig.Logger()
 	customerID := autoconfig.CustomerID()
 	integrationID := autoconfig.IntegrationInstanceID()
 	config := autoconfig.Config()
-	return g.fetchAccounts(customerID, integrationID, config)
+	return g.fetchAccounts(logger, customerID, integrationID, config)
 }
 
 // Stop is called when the integration is shutting down for cleanup
-func (g *AzureIntegration) Stop() error {
-	sdk.LogInfo(g.logger, "stopping")
+func (g *AzureIntegration) Stop(logger sdk.Logger) error {
+	sdk.LogInfo(logger, "stopping")
 	return nil
 }
 
 func (g *AzureIntegration) Validate(validate sdk.Validate) (result map[string]interface{}, err error) {
 
+	logger := validate.Logger()
 	customerID := validate.CustomerID()
 	integrationID := validate.IntegrationInstanceID()
 	config := validate.Config()
 
-	conf, err := g.fetchAccounts(customerID, integrationID, config)
+	conf, err := g.fetchAccounts(logger, customerID, integrationID, config)
 	if err != nil {
 		return nil, err
 	}
