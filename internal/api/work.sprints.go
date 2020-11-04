@@ -22,8 +22,9 @@ func (a *API) FetchSprints(projid string, teamids []string) error {
 		}
 		for _, r := range out.Value {
 			sprint := &sdk.AgileSprint{
-				Active:     true,
-				CustomerID: a.customerID,
+				Active:                true,
+				CustomerID:            a.customerID,
+				IntegrationInstanceID: &a.integrationID,
 				// Goal is missing
 				Name:    r.Name,
 				RefID:   r.Path, // ID's don't match changelog IDs, use path here and IterationPath there
