@@ -1,7 +1,7 @@
 name: Azure DevOps
 ref_type: azure
 description: This is the official Azure DevOps integration for Pinpoint
-avatar_url: https://img.icons8.com/color/240/000000/azure-1.png
+avatar_url: https://pinpoint.com/images/integrations/Azure.svg
 capabilities:
   - work.User
   - work.Project
